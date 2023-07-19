@@ -1,4 +1,4 @@
-# update comments
+# update comments to account for list of folders to go through, not just a single folder
 
 
 
@@ -26,7 +26,7 @@ class Preprocessing:
     def __init__(self, fits_folder_paths, angle_folder, ccd_folder, raw_angles_file_paths):
         '''
         initializes a Preprocessing object for this class. It 
-        identifies the path to the folder containing fits files, as 
+        identifies the paths to the folders containing fits files, as 
         well as the names of the folders where the angles and ccd 
         numpy arrays will be kept.
         '''
@@ -38,6 +38,7 @@ class Preprocessing:
     def get_arr(self, fits_filename, fits_folder_path):
         '''
         input: the name of the fits file we need to get info out of
+                the path to the fodler where the fits file is in
         output: numpy array of four ccd images
         '''
 #         fits.info(fits_folder_paths + fits_filename)
@@ -46,14 +47,13 @@ class Preprocessing:
     
     def process_angles(self):
         '''
-        input: filepath and filename to .out file with angles
+        input: None
         output: None
-        iterates through the file line by line and creates a
+        iterates over each folder, and iterates through the file line by line and creates a
         dictionary with key=image number and value=tuple of values.
         It then pickles the dictionary and saves it into the angle 
         folder with the name "angles_data.pkl"
         '''
-        angles_dic = {'title': ('one', 'two','three')}
         angles_dic = {'title': ('E3ez', 'E3az', 'M3el', 'M3az', '1/ED', '1/MD', '1/ED^2', '1/ED^2')}
         #FIN ED MD Eel Eaz Mel Maz E1el E1az E2el E2az E3ez E3az E4el E4az M1el M1az M2el M2az M3el M3az M4el M4az
         
@@ -70,7 +70,6 @@ class Preprocessing:
     
         with open(self.angle_folder + 'angles_Oall_data.pkl', 'wb') as file:
             pickle.dump(angles_dic, file)
-        #     print('Angles dictionary saved successfully to file')
     
     def save_process_CCD(self, arr, reduced_px, alpha, fits_filename):
         '''
@@ -129,13 +128,11 @@ class Preprocessing:
         # normalizes array values to be between 0 and 1
         new_arr = (new_arr - np.min(new_arr)) / (np.max(new_arr) - np.min(new_arr))
         
-        # plt.figure()
-        # plt.imshow(arr, cmap='gray')
-        # plt.colorbar()
-        
-        # plt.figure()
-        # plt.imshow(new_arr, cmap='gray')
-        # plt.colorbar()
+        # set 2x2 pixels in each corner to 0 - ignore
+        new_arr[0][0], new_arr[1][0], new_arr[0][1], new_arr[1][1] = 0,0,0,0
+        new_arr[-1][-1], new_arr[-1][-2], new_arr[-2][-1], new_arr[-2][-2] = 0,0,0,0
+        new_arr[-1][0], new_arr[-1][1], new_arr[-2][0], new_arr[-2][1] = 0,0,0,0
+        new_arr[0][-1], new_arr[0][-2], new_arr[1][-1], new_arr[1][-2] = 0,0,0,0
         
         # pickle and save
         with open(self.ccd_folder + fits_filename[:-8] + '_ccd.pkl', 'wb') as file:      
@@ -147,33 +144,31 @@ class Preprocessing:
         output: None
         runs the functionality described above using the functions within this class
         '''
-#         # processes and saves angles
-#         self.process_angles()
-#         print('Angles done.')
+        # processes and saves angles
+        self.process_angles()
+        print('Angles done.')
         
-#         # processes and saves fits files, images
-#         counter = 0
-#         for folder_path in self.fits_folder_paths:
-#             for fits_filename in os.listdir(folder_path):
-#                 if len(fits_filename) > 40 and fits_filename[-7:]=='fits.gz' and fits_filename[27] == '3':
-#                     # print(fits_filename, fits_filename[-4:], len(fits_filename))
-#                     arr = self.get_arr(fits_filename, folder_path)
-#                     self.save_process_CCD(arr, 16, 10, fits_filename)
-# #                     print(fits_filename[27])
-#                     print(counter, fits_filename)
-#                     counter += 1
-#                 else:
-#                     print('Skipped' + fits_filename)
-# #                 print(counter, fits_filename)
-# #                 counter += 1
-#         print('Images done.')
+        # processes and saves fits files, images
+        counter = 0
+        for folder_path in self.fits_folder_paths:
+            for fits_filename in os.listdir(folder_path):
+                if len(fits_filename) > 40 and fits_filename[-7:]=='fits.gz' and fits_filename[27] == '3':
+                    # print(fits_filename, fits_filename[-4:], len(fits_filename))
+                    arr = self.get_arr(fits_filename, folder_path)
+                    self.save_process_CCD(arr, 16, 10, fits_filename)
+#                     print(fits_filename[27])
+                    print(counter, fits_filename)
+                    counter += 1
+                else:
+                    print('Skipped' + fits_filename)
+        print('Images done.')
 
 
 if __name__ == '__main__':
-    fits_folder_paths = ["//pdo//users//roland//SL_data//O10_data//", "//pdo//users//roland//SL_data//O11_data//", "//pdo//users//roland//SL_data//O12_data//", "//pdo//users//roland//SL_data//O13_data//", "//pdo//users//roland//SL_data//O14_data//", "//pdo//users//roland//SL_data//O15_data//"]
+    fits_folder_paths = ["//pdo//users//roland//SL_data//O11_data//", "//pdo//users//roland//SL_data//O12_data//", "//pdo//users//roland//SL_data//O13_data//", "//pdo//users//roland//SL_data//O14_data//", "//pdo//users//roland//SL_data//O15_data//", "//pdo//users//roland//SL_data//O16_data//", "//pdo//users//roland//SL_data//O17_data//"][1:]
     angle_folder = "//pdo//users//jlupoiii//TESS//model_light//angles//"
     ccd_folder = "//pdo//users//jlupoiii//TESS//model_light//ccds//"
-    raw_angles_file_paths = ["//pdo//users//roland//SL_data//altazzes//O10_altaz.out", "//pdo//users//roland//SL_data//altazzes//O11_altaz.out", "//pdo//users//roland//SL_data//altazzes//O12_altaz.out", "//pdo//users//roland//SL_data//altazzes//O13_altaz.out", "//pdo//users//roland//SL_data//altazzes//O14_altaz.out", "//pdo//users//roland//SL_data//altazzes//O15_altaz.out"]
+    raw_angles_file_paths = ["//pdo//users//roland//SL_data//altazzes//O11_altaz.out", "//pdo//users//roland//SL_data//altazzes//O12_altaz.out", "//pdo//users//roland//SL_data//altazzes//O13_altaz.out", "//pdo//users//roland//SL_data//altazzes//O14_altaz.out", "//pdo//users//roland//SL_data//altazzes//O15_altaz.out", "//pdo//users//roland//SL_data//altazzes//O16_altaz.out", "//pdo//users//roland//SL_data//altazzes//O17_altaz.out"][1:]
 
     processor = Preprocessing(fits_folder_paths, angle_folder, ccd_folder, raw_angles_file_paths)
     processor.run()
