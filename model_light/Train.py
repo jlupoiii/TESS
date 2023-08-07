@@ -79,8 +79,8 @@ class Dense_NN(nn.Module):
 
 def train_NN():
     # get data
-    angle_folder = "//pdo//users//jlupoiii//TESS//model_light//angles//"
-    ccd_folder = "//pdo//users//jlupoiii//TESS//model_light//ccds//"
+    angle_folder = "//pdo//users//jlupoiii//TESS//data//angles//"
+    ccd_folder = "//pdo//users//jlupoiii//TESS//data//ccds//"
     predictions_folder = "//pdo//users//jlupoiii//TESS//model_light//predictions//"
 
     # data matrices
@@ -160,6 +160,7 @@ def train_NN():
     plt.close()
     
     print("saved model history (loss graphs)")
+    
     
     # save model's state dictionary
     torch.save(model.state_dict(), 'model_dense_pytorch.pth')
@@ -260,8 +261,8 @@ if __name__=='__main__':
 # def train_NN():
 
 #     # get data
-#     angle_folder = "//pdo//users//jlupoiii//TESS//model_light//angles//"
-#     ccd_folder = "//pdo//users//jlupoiii//TESS//model_light//ccds//"
+#     angle_folder = "//pdo//users//jlupoiii//TESS//data//angles//"
+#     ccd_folder = "//pdo//users//jlupoiii//TESS//data//ccds//"
 #     predictions_folder = "//pdo//users//jlupoiii//TESS//model_light//predictions//"
 
 #     # data matrices

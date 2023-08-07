@@ -30,8 +30,8 @@ def predict():
     model = load_model('model_dense')
     
     # get data
-    angle_folder = "//pdo//users//jlupoiii//model_light//angles//"
-    ccd_folder = "//pdo//users//jlupoiii//model_light//ccds//"
+    angle_folder = "//pdo//users//jlupoiii//TESS//data//angles//"
+    ccd_folder = "//pdo//users//jlupoiii//TESS//data//ccds//"
     predictions_folder = "//pdo//users//jlupoiii//model_light//predictions//"
 
     angles_dic = pickle.load(open(angle_folder+'angles_O13_data.pkl', "rb"))
