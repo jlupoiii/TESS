@@ -658,10 +658,92 @@ plt.close()
 print('saved loss graph')
 
 
+########################
+# LINEAR INTERPOLATION #
+########################
 
+images = [[y_test[10:11], y_test[192:193]],
+          [y_test[2:3], y_test[46:47]],
+          [y_test[1:2], y_test[47:48]],
+          [y_test[30:31], y_test[76:77]],
+          [y_test[4:5], y_test[24:25]],
+          [y_test[15:16], y_test[23:24]],
+          [y_test[21:22], y_test[100:101]],
+          [y_test[0:1], y_test[64:65]],
+          [y_test[61:62], y_test[84:85]],
+          [y_test[12:13], y_test[78:79]]
+          ]
 
+zs = []
 
+for pair in images:
+    x1, x2 = pair[0], pair[1]
 
+    # Encode
+    z1, _ = model(x1, forward=True)
+    z1 = z1[0]
+    z2, _ = model(x2, forward=True)
+    z2 = z2[0]
+
+    zs.append([z1, z2])
+
+# Interpolate
+num = 10
+latents_full = []
+
+for pair in zs:
+    z1, z2 = pair[0], pair[1]
+    lis = []
+    alpha = 0
+    for i in range(num):
+        lis.append((1 - alpha) * z1 + alpha * z2)
+        alpha += 1 / (num - 1.0)
+    latents_full.append(lis)
+
+# Decode
+decodings = []
+
+for latents in latents_full:
+    imgs = []
+    for i, z in enumerate(latents):
+        output = model(z, forward=False, reconstruct=True)
+        imgs.append(output)
+    decodings.append(imgs)
+
+# Plot
+fig = plt.figure(figsize=(8, 8))
+
+for row in range(10):
+    for col in range(num):
+        fig.add_subplot(10, num, row * num + col + 1)
+        plt.imshow(decodings[row][col][0, :, :, 0], cmap="gray")
+        plt.axis('off')
+
+# SAMPLE NEW IMAGES
+
+rows = 10
+cols = 10
+
+images = []
+
+for r in range(rows):
+    for c in range(cols):
+        x = model.sample_image(temperature=0.7)
+        images.append(x)
+
+# Plot
+fig = plt.figure(figsize=(8, 8))
+
+for r in range(rows):
+    for c in range(cols):
+        fig.add_subplot(rows, cols, r * cols + c + 1)
+        plt.imshow(images[r * cols + c][0, :, :, 0], cmap="gray")
+        plt.axis('off')
+
+plt.savefig('linear_interpolation.png')
+plt.close()
+
+print('saved image of linear interpolation')
 
 
 
