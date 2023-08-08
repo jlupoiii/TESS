@@ -7,6 +7,7 @@ from tensorflow import keras
 from tensorflow.keras.layers import Layer
 from sklearn.model_selection import train_test_split
 import numpy as np
+import matplotlib.pyplot as plt
 import pickle
 import os
 
@@ -590,9 +591,9 @@ class Glow(keras.Model):
 
 # Retreiving data
 
-angle_folder = "//pdo//users//jlupoiii//TESS//data//angles//"
-ccd_folder = "//pdo//users//jlupoiii//TESS//data//ccds//"
-predictions_folder = "//pdo//users//jlupoiii//TESS//model_light//predictions//"
+angle_folder = "//content//TESS//data//angles//"
+ccd_folder = "//content//TESS//data//ccds//"
+predictions_folder = "//content//TESS//model_light//predictions//"
 
 # data matrices
 X = []
@@ -636,15 +637,25 @@ model = Glow(steps=1, levels=3, img_shape=(16, 16, 1), hidden_channels=512, perm
 
 adam = keras.optimizers.Adam(learning_rate=lr)
 model.compile(optimizer=adam)
-model.fit(y_train, epochs=70, batch_size=128)
+history = model.fit(y_train, epochs=100, batch_size=128)
 
 print('finished training')
 
-# Plot loss
-loss = model.history.history["loss"]
-epochs = np.arange(len(loss))
-plt.plot(epochs, loss, color="r")
+# save model
+model.save('model')
 
+print("model saved")
+
+# plotting losses over epochs 
+plt.plot(range(10,len(history.history['loss'])), history.history['loss'][10:])
+plt.title('Training Loss over Epochs')
+plt.xlabel('Epoch')
+plt.ylabel('Loss (MSE)')
+plt.yscale('log')
+plt.savefig('training_loss.png')
+plt.close()
+
+print('saved loss graph')
 
 
 
