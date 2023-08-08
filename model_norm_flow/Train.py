@@ -637,7 +637,7 @@ model = Glow(steps=1, levels=3, img_shape=(16, 16, 1), hidden_channels=512, perm
 
 adam = keras.optimizers.Adam(learning_rate=lr)
 model.compile(optimizer=adam)
-history = model.fit(y_train, epochs=100, batch_size=128)
+history = model.fit(y_train, epochs=1000, batch_size=128)
 
 print('finished training')
 
