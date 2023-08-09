@@ -168,5 +168,5 @@ if __name__ == '__main__':
     ccd_folder = "//pdo//users//jlupoiii//TESS//data//ccds//"
     raw_angles_file_paths = ["//pdo//users//roland//SL_data//altazzes//O11_altaz.out", "//pdo//users//roland//SL_data//altazzes//O12_altaz.out", "//pdo//users//roland//SL_data//altazzes//O13_altaz.out", "//pdo//users//roland//SL_data//altazzes//O14_altaz.out", "//pdo//users//roland//SL_data//altazzes//O15_altaz.out", "//pdo//users//roland//SL_data//altazzes//O16_altaz.out", "//pdo//users//roland//SL_data//altazzes//O17_altaz.out"][1:]
 
-    processor = Preprocessing(fits_folder_paths, angle_folder, ccd_folder, raw_angles_file_paths)
-    processor.run()
+    processor_save_data = Preprocessing(fits_folder_paths, angle_folder, ccd_folder, raw_angles_file_paths)
+    processor_save_data.run()
