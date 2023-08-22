@@ -62,11 +62,12 @@ class Preprocessing:
                     arr = line.strip().split()
                     if len(arr)<2: break
                     arr = [float(arr[i]) if i>0 else str(arr[i]) for i in range(len(arr))]
-                    # print(arr)
+                    print(arr)
                     angles_dic[arr[0]] = tuple(arr[1:] + [1/arr[1], 1/arr[2]] + [1/arr[1]**2, 1/arr[2]**2])
+                    # angles_dic[arr[0]] = tuple(arr[1:] + [1/(arr[1]/50), 1/(arr[2]/50)] + [1/(arr[1]/50)**2, 1/(arr[2]/50)**2]) # scaling the distances
         print(len(angles_dic.keys()))
     
-        with open(self.angle_folder + 'angles_Oall_data.pkl', 'wb') as file:
+        with open(self.angle_folder + 'angles_O13_data.pkl', 'wb') as file:
             pickle.dump(angles_dic, file)
     
     def save_process_CCD(self, arr, reduced_px, alpha, fits_filename):
@@ -163,10 +164,11 @@ class Preprocessing:
 
 
 if __name__ == '__main__':
-    fits_folder_paths = ["//pdo//users//roland//SL_data//O11_data//", "//pdo//users//roland//SL_data//O12_data//", "//pdo//users//roland//SL_data//O13_data//", "//pdo//users//roland//SL_data//O14_data//", "//pdo//users//roland//SL_data//O15_data//", "//pdo//users//roland//SL_data//O16_data//", "//pdo//users//roland//SL_data//O17_data//"][1:]
+    fits_folder_paths = ["//pdo//users//roland//SL_data//O11_data//", "//pdo//users//roland//SL_data//O12_data//", "//pdo//users//roland//SL_data//O13_data//", "//pdo//users//roland//SL_data//O14_data//", "//pdo//users//roland//SL_data//O15_data//", "//pdo//users//roland//SL_data//O16_data//", "//pdo//users//roland//SL_data//O17_data//"][2:3]
     angle_folder = "//pdo//users//jlupoiii//TESS//data//angles//"
     ccd_folder = "//pdo//users//jlupoiii//TESS//data//ccds//"
-    raw_angles_file_paths = ["//pdo//users//roland//SL_data//altazzes//O11_altaz.out", "//pdo//users//roland//SL_data//altazzes//O12_altaz.out", "//pdo//users//roland//SL_data//altazzes//O13_altaz.out", "//pdo//users//roland//SL_data//altazzes//O14_altaz.out", "//pdo//users//roland//SL_data//altazzes//O15_altaz.out", "//pdo//users//roland//SL_data//altazzes//O16_altaz.out", "//pdo//users//roland//SL_data//altazzes//O17_altaz.out"][1:]
+    raw_angles_file_paths = ["//pdo//users//roland//SL_data//altazzes//O11_altaz.out", "//pdo//users//roland//SL_data//altazzes//O12_altaz.out", "//pdo//users//roland//SL_data//altazzes//O13_altaz.out", "//pdo//users//roland//SL_data//altazzes//O14_altaz.out", "//pdo//users//roland//SL_data//altazzes//O15_altaz.out", "//pdo//users//roland//SL_data//altazzes//O16_altaz.out", "//pdo//users//roland//SL_data//altazzes//O17_altaz.out"][2:3]
 
+    
     processor_save_data = Preprocessing(fits_folder_paths, angle_folder, ccd_folder, raw_angles_file_paths)
     processor_save_data.run()
