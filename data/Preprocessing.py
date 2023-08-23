@@ -52,7 +52,7 @@ class Preprocessing:
         It then pickles the dictionary and saves it into the angle 
         folder with the name "angles_data.pkl"
         '''
-        angles_dic = {'title': ('E3ez', 'E3az', 'M3el', 'M3az', '1/ED', '1/MD', '1/ED^2', '1/ED^2')}
+        angles_dic = {'title': ('E3el', 'E3az', 'M3el', 'M3az', '1/ED', '1/MD', '1/ED^2', '1/MD^2')}
         #FIN ED MD Eel Eaz Mel Maz E1el E1az E2el E2az E3ez E3az E4el E4az M1el M1az M2el M2az M3el M3az M4el M4az
         
         # opens file and reads line by line
