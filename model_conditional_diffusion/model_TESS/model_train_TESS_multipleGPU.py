@@ -489,22 +489,22 @@ class TESSDataset(Dataset):
 # MODEL TRAINING
 
 # hardcoding these here
-n_epoch = 1000
-batch_size = 8
+n_epoch = 1500
+batch_size = 16
 train_ratio = 0.8
 n_T = 600 # 400
-n_feat = 128 # 128 ok, 256 better (but slower)
+n_feat = 256 # 128 ok, 256 better (but slower)
 lrate = 1e-4
 save_model = True
-epoch_checkpoint = 50
+epoch_checkpoint = 100
 checkpoint_gpu = 0
 
 # dataset parameters
-save_dir = 'model_TESS_O11-54_im256x256/'
+save_dir = 'model_TESS_O11-54_im64x64_multipleGPUs_1/'
 os.makedirs(save_dir, exist_ok=True)
 angle_filename = 'angles_O11-54_data_dic.pkl'
-ccd_folder = "/pdo/users/jlupoiii/TESS/data/processed_images_im256x256/"
-image_shape = (256,256)
+ccd_folder = "/pdo/users/jlupoiii/TESS/data/processed_images_im64x64/"
+image_shape = (64,64)
 num_processes = 80
 
 # saves txt file with info about model parameters
@@ -527,6 +527,31 @@ num_valid_samples = len(tess_dataset) - num_train_samples
 train_dataset, valid_dataset = random_split(tess_dataset, [num_train_samples, num_valid_samples])
 # train_dataloader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True, num_workers=0, drop_last=True)
 # valid_dataloader = DataLoader(valid_dataset, batch_size=batch_size, shuffle=True, num_workers=0, drop_last=True)
+
+# saving datapoints that are in training set vs validation set.
+training_dataset_ffis = [train_dataset[index]['ffi_num'] for index in range(len(train_dataset))]
+validation_dataset_ffis = [valid_dataset[index]['ffi_num'] for index in range(len(valid_dataset))]
+with open(os.path.join(save_dir, 'training_dataset_ffinumbers.pkl'), 'wb') as file:
+    pickle.dump(training_dataset_ffis, file)
+    print(f"saved training dataset to {file}")
+with open(os.path.join(save_dir, 'validation_dataset_ffinumbers.pkl'), 'wb') as file:
+    pickle.dump(validation_dataset_ffis, file)
+    print(f"saved validation dataset to {file}")
+
+
+
+with open(os.path.join(save_dir, 'model_info.txt'), 'w') as f:
+    f.write("MODEL AND DATA INFORMATION\n")
+    f.write(f"Max number of epochs\t\t\t{n_epoch}\n")
+    f.write(f"Batch size\t\t\t\t\t\t{batch_size}\n")
+    f.write(f"training/validation ratio\t\t{train_ratio}\n")
+    f.write(f"n_T (diffusion timesteps)\t\t{n_T}\n")
+    f.write(f"n_feat (CNN num of features)\t{n_feat}\n")
+    f.write(f"Learning rate\t\t\t\t\t{lrate}\n")
+    f.write(f"Image size\t\t\t\t\t\t{image_shape}\n")
+    f.write(f"GPUs used\t\t\t\t\t\t{torch.cuda.device_count()}")
+    print('saved model info')
+
 
 print(f'Full dataset has {num_train_samples+num_valid_samples} datapoints')
 print(f'Training dataset has {num_train_samples} datapoints')
@@ -627,8 +652,10 @@ def train(rank, world_size):
             time_history.append(round((time.time() - start_training_time)/3600, 3))
 
             
-            
+            # print(f'Will we run the checkpoint? This is epoch {ep}. Rank is {rank}, {type(rank)}. GPU is {checkpoint_gpu}, {type(checkpoint_gpu)}, where our condition is {rank==checkpoint_gpu}')
             if (ep%epoch_checkpoint==0 or ep == int(n_epoch-1)) and rank==checkpoint_gpu: # for multiple GPUs, only do predictions on GPU with rank <checkpoint_gpu> to only do predictions once.
+
+                print(f'Running checkpoint at epoch {ep} on GPU {checkpoint_gpu}')
                 
                 n_datapoint = min(10, batch_size) # want at most 10 and at least batch_size datapoints
                 n_sample = 5
@@ -722,7 +749,7 @@ def train(rank, world_size):
                         
                 # optionally save model
                 if save_model:
-                    torch.save(ddpm.state_dict(), save_dir + f"model_epoch{ep}.pth")
+                    torch.save(ddpm.module.state_dict(), save_dir + f"model_epoch{ep}.pth")
                     print('saved model at ' + save_dir + f"model_epoch{ep}.pth")
         
 
