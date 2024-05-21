@@ -489,7 +489,7 @@ class TESSDataset(Dataset):
 
 # hardcoding these here
 n_epoch = 1500
-batch_size = 16
+batch_size = 8
 train_ratio = 0.8
 n_T = 600 # 400
 n_feat = 256 # 128 ok, 256 better (but slower)
@@ -497,63 +497,59 @@ lrate = 1e-4
 save_model = True
 epoch_checkpoint = 100
 checkpoint_gpu = 0
+patience = 20 # for early stopping
 
 # dataset parameters
-save_dir = 'model_TESS_O11-54_im32x32_multipleGPUs_split_orbits/'
+save_dir = 'model_TESS_O11-54_im128x128_multipleGPUs_splitOrbits_earlyStop/'
 os.makedirs(save_dir, exist_ok=True)
 angle_filename = 'angles_O11-54_data_dic.pkl'
-ccd_folder = "/pdo/users/jlupoiii/TESS/data/processed_images_im32x32/"
-image_shape = (32,32)
+ccd_folder = "/pdo/users/jlupoiii/TESS/data/processed_images_im128x128/"
+image_shape = (128,128)
 num_processes = 80
+
+# saves txt file with info about model parameters
+with open(os.path.join(save_dir, 'model_info.txt'), 'w') as f:
+    f.write("MODEL AND DATA INFORMATION\n")
+    f.write(f"Max number of epochs\t\t\t{n_epoch}\n")
+    f.write(f"Batch size\t\t\t\t\t\t{batch_size}\n")
+    f.write(f"training/validation ratio\t\t{train_ratio}\n")
+    f.write(f"n_T (diffusion timesteps)\t\t{n_T}\n")
+    f.write(f"n_feat (CNN num of features)\t{n_feat}\n")
+    f.write(f"Learning rate\t\t\t\t\t{lrate}\n")
+    f.write(f"Image size\t\t\t\t\t\t{image_shape}\n")
+    f.write(f"GPUs used\t\t\t\t\t\t{torch.cuda.device_count()}")
+    print('saved model info')
 
 
 tess_dataset = TESSDataset(angle_filename, ccd_folder, image_shape, num_processes)
 
-# randomly separate data into training and validation sets
-# train:20768, valid:5192 - random
-num_train_samples = int(train_ratio * len(tess_dataset))
-num_valid_samples = len(tess_dataset) - num_train_samples
-train_dataset, valid_dataset = random_split(tess_dataset, [num_train_samples, num_valid_samples])
+# # randomly separate data into training and validation sets
+# # train:20768, valid:5192 - random
+# num_train_samples = int(train_ratio * len(tess_dataset))
+# num_valid_samples = len(tess_dataset) - num_train_samples
+# train_dataset, valid_dataset = random_split(tess_dataset, [num_train_samples, num_valid_samples])
 
-# # separate data into training and validation sets by orbit. training: 11-46, validation: 47-54
-# # train:21021, valid:4939 - by orbit, <= 46 and > 46
-# train_indices = [idx for idx, data_point in enumerate(tess_dataset) if int(data_point["orbit"]) <= 46]
-# valid_indices = [idx for idx, data_point in enumerate(tess_dataset) if int(data_point["orbit"]) > 46]
-# train_dataset = Subset(tess_dataset, train_indices)
-# valid_dataset = Subset(tess_dataset, valid_indices)
-# num_train_samples = len(train_indices)
-# num_valid_samples = len(valid_indices)
+# separate data into training and validation sets by orbit. training: 11-46, validation: 47-54
+# train:21021, valid:4939 - by orbit, <= 46 and > 46
+train_indices = [idx for idx, data_point in enumerate(tess_dataset) if int(data_point["orbit"]) <= 46]
+valid_indices = [idx for idx, data_point in enumerate(tess_dataset) if int(data_point["orbit"]) > 46]
+train_dataset = Subset(tess_dataset, train_indices)
+valid_dataset = Subset(tess_dataset, valid_indices)
+num_train_samples = len(train_indices)
+num_valid_samples = len(valid_indices)
 
-# train_indices= 0
-# valid_indices = 0
+# train_dataloader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True, num_workers=0, drop_last=True)
+# valid_dataloader = DataLoader(valid_dataset, batch_size=batch_size, shuffle=True, num_workers=0, drop_last=True)
 
-train_dataloader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True, num_workers=0, drop_last=True)
-valid_dataloader = DataLoader(valid_dataset, batch_size=batch_size, shuffle=True, num_workers=0, drop_last=True)
-
-# # saving datapoints that are in training set vs validation set.
-# training_dataset_ffis = [train_dataset[index]['ffi_num'] for index in range(len(train_dataset))]
-# validation_dataset_ffis = [valid_dataset[index]['ffi_num'] for index in range(len(valid_dataset))]
-# with open(os.path.join(save_dir, 'training_dataset_ffinumbers.pkl'), 'wb') as file:
-#     pickle.dump(training_dataset_ffis, file)
-#     print(f"saved training dataset to {file}")
-# with open(os.path.join(save_dir, 'validation_dataset_ffinumbers.pkl'), 'wb') as file:
-#     pickle.dump(validation_dataset_ffis, file)
-#     print(f"saved validation dataset to {file}")
-
-
-# # saves txt file with info about model parameters
-# with open(os.path.join(save_dir, 'model_info.txt'), 'w') as f:
-#     f.write("MODEL AND DATA INFORMATION\n")
-#     f.write(f"Max number of epochs\t\t\t{n_epoch}\n")
-#     f.write(f"Batch size\t\t\t\t\t\t{batch_size}\n")
-#     f.write(f"training/validation ratio\t\t{train_ratio}\n")
-#     f.write(f"n_T (diffusion timesteps)\t\t{n_T}\n")
-#     f.write(f"n_feat (CNN num of features)\t{n_feat}\n")
-#     f.write(f"Learning rate\t\t\t\t\t{lrate}\n")
-#     f.write(f"Image size\t\t\t\t\t\t{image_shape}\n")
-#     f.write(f"GPUs used\t\t\t\t\t\t{torch.cuda.device_count()}")
-#     print('saved model info')
-
+# saving datapoints that are in training set vs validation set.
+training_dataset_ffis = [train_dataset[index]['ffi_num'] for index in range(len(train_dataset))]
+validation_dataset_ffis = [valid_dataset[index]['ffi_num'] for index in range(len(valid_dataset))]
+with open(os.path.join(save_dir, 'training_dataset_ffinumbers.pkl'), 'wb') as file:
+    pickle.dump(training_dataset_ffis, file)
+    print(f"saved training dataset to {file}")
+with open(os.path.join(save_dir, 'validation_dataset_ffinumbers.pkl'), 'wb') as file:
+    pickle.dump(validation_dataset_ffis, file)
+    print(f"saved validation dataset to {file}")
 
 print(f'Full dataset has {num_train_samples+num_valid_samples} datapoints')
 print(f'Training dataset has {num_train_samples} datapoints')
@@ -561,9 +557,6 @@ print(f'Validation dataset has {num_valid_samples} datapoints')
 print(f"x-shape:, {tess_dataset[0]['x'].shape}")
 print(f"y-shape:, {tess_dataset[0]['y'].shape}")
 print()
-
-
-torch.cuda.empty_cache()
 
 def setup(rank, world_size):
     os.environ['MASTER_ADDR'] = 'localhost'
@@ -577,15 +570,6 @@ def train(rank, world_size):
 
     device = torch.device(f'cuda:{rank}')
 
-    torch.cuda.empty_cache()
-
-    # Create model and optimizer
-    ddpm = DDPM(nn_model=ContextUnet(in_channels=1, n_feat=n_feat), betas=(1e-4, 0.02), n_T=n_T, device=device, drop_prob=0.1)
-    ddpm = nn.parallel.DistributedDataParallel(ddpm, device_ids=[rank])
-    
-    optim = torch.optim.Adam(ddpm.parameters(), lr=lrate)
-
-
     # Create training dataloader, different for each GPU
     train_sampler = DistributedSampler(train_dataset, num_replicas=world_size, rank=rank, shuffle=False, drop_last=False)
     train_dataloader = DataLoader(train_dataset, batch_size=batch_size, pin_memory=False, num_workers=0, drop_last=True, shuffle=False, sampler=train_sampler)
@@ -598,11 +582,11 @@ def train(rank, world_size):
     
     print(f"GPU of rank {rank} has {len(train_dataloader)} training batches and {len(valid_dataloader)} validation batches")
 
-    # # Create model and optimizer
-    # ddpm = DDPM(nn_model=ContextUnet(in_channels=1, n_feat=n_feat), betas=(1e-4, 0.02), n_T=n_T, device=device, drop_prob=0.1)
-    # ddpm = nn.parallel.DistributedDataParallel(ddpm, device_ids=[rank])
+    # Create model and optimizer
+    ddpm = DDPM(nn_model=ContextUnet(in_channels=1, n_feat=n_feat), betas=(1e-4, 0.02), n_T=n_T, device=device, drop_prob=0.1)
+    ddpm = nn.parallel.DistributedDataParallel(ddpm, device_ids=[rank])
     
-    # optim = torch.optim.Adam(ddpm.parameters(), lr=lrate)
+    optim = torch.optim.Adam(ddpm.parameters(), lr=lrate)
 
     loss_history_train = []
     loss_history_valid = []
@@ -665,9 +649,14 @@ def train(rank, world_size):
             # keeps track of time
             time_history.append(round((time.time() - start_training_time)/3600, 3))
 
+            # condidions for early stopping. If no improvement has been seen in validation loss in 'patience' num epochs
+            not_improving = (loss_history_valid[-1*patience:][0] == min(loss_history_valid[-1*patience:]))
+            all_training_below_valid = all(t <= v for t, v in zip(loss_history_train[-1*patience:], loss_history_valid[-1*patience:]))
+            stop_early = not_improving and all_training_below_valid
+
             
             # print(f'Will we run the checkpoint? This is epoch {ep}. Rank is {rank}, {type(rank)}. GPU is {checkpoint_gpu}, {type(checkpoint_gpu)}, where our condition is {rank==checkpoint_gpu}')
-            if (ep%epoch_checkpoint==0 or ep == int(n_epoch-1)) and rank==checkpoint_gpu: # for multiple GPUs, only do predictions on GPU with rank <checkpoint_gpu> to only do predictions once.
+            if (ep%epoch_checkpoint==0 or ep == int(n_epoch-1) or stop_early) and rank==checkpoint_gpu: # for multiple GPUs, only do predictions on GPU with rank <checkpoint_gpu> to only do predictions once.
 
                 print(f'Running checkpoint at epoch {ep} on GPU {checkpoint_gpu}')
                 
@@ -765,64 +754,11 @@ def train(rank, world_size):
                 if save_model:
                     torch.save(ddpm.module.state_dict(), save_dir + f"model_epoch{ep}.pth")
                     print('saved model at ' + save_dir + f"model_epoch{ep}.pth")
-        
 
-
-    # for ep in range(n_epoch):
-    #     print(f'epoch {ep} training')
-    #     ddpm.train()
-
-    #     # linear lrate decay
-    #     optim.param_groups[0]['lr'] = lrate*(1-ep/n_epoch)
-
-    #     pbar_train = tqdm(train_dataloader)
-    #     loss_ema_train = None
-
-    #     for data_dic_train in pbar_train:
-    #         optim.zero_grad()
-    #         x_train = data_dic_train['y'].to(device)
-    #         c_train = data_dic_train['x'].to(device)
-    #         ffi_nums_train = data_dic_train['ffi_num']
-    #         orbits_train = data_dic_train['orbit']
-
-    #         loss_train = ddpm(x_train, c_train).to(device)
-    #         loss_train.backward()
-    #         if loss_ema_train is None:
-    #             loss_ema_train = loss_train.item()
-    #         else:
-    #             loss_ema_train = 0.95 * loss_ema_train + 0.05 * loss_train.item()
-    #         pbar_train.set_description(f"training loss: {loss_ema_train:.4f}")
-    #         optim.step()
-
-    #     loss_history_train.append(loss_ema_train)
-        
-    #     # for eval, save an image of rows of datapoint predictions. The first column are the real
-    #     # images and the rest are predictions
-    #     ddpm.eval()
-    #     with torch.no_grad():
-    #         # calculating validation loss for the epoch
-    #         print(f'epoch {ep} validation')
-    #         pbar_valid = tqdm(valid_dataloader)
-    #         loss_ema_valid = None
-    #         for data_dic_valid in pbar_valid:
-    #             x_valid = data_dic_valid['y'].to(device)
-    #             c_valid = data_dic_valid['x'].to(device)
-    #             ffi_nums_valid = data_dic_valid['ffi_num']
-    #             orbits_valid = data_dic_valid['orbit']
-    
-    #             loss_valid = ddpm(x_valid, c_valid)
-    #             if loss_ema_valid is None:
-    #                 loss_ema_valid = loss_valid.item()
-    #             else:
-    #                 loss_ema_valid = 0.95 * loss_ema_valid + 0.05 * loss_valid.item()
-    #             pbar_valid.set_description(f"validation loss: {loss_ema_valid:.4f}")
-    #         loss_history_valid.append(loss_ema_valid)
-
-        
-    #     # optionally save model
-    #     if save_model and ep == int(n_epoch-1):
-    #         torch.save(ddpm.state_dict(), save_dir + f"model_{ep}.pth")
-    #         print('saved model at ' + save_dir + f"model_{ep}.pth")
+                # handles stopping early
+                if stop_early:
+                    break
+                    
 
         
     # Clean up
