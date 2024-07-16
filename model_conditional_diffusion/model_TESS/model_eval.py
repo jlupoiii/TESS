@@ -1,9 +1,6 @@
 #!/usr/bin/env python
 # coding: utf-8
 
-# In[1]:
-
-
 ''' 
 This Script displays the image predictions for a loaded model
 
@@ -24,13 +21,6 @@ https://arxiv.org/abs/2205.11487
 '''
 import os
 
-# # Set environment variables before importing PyTorch
-# os.environ["TORCH_USE_CUDA_DSA"] = "1"  # Enable device-side assertions
-# os.environ["CUDA_LAUNCH_BLOCKING"] = "1" 
-# os.environ["PYTORCH_CUDA_ALLOC_CONF"] = "max_split_size_mb:1024"
-
-
-
 from typing import Dict, Tuple
 from tqdm import tqdm
 import torch
@@ -46,8 +36,6 @@ from IPython.display import HTML
 
 torch.cuda.init()
 torch.cuda.empty_cache()
-# torch.cuda.reset_max_memory_allocated()
-# torch.cuda.reset_max_memory_cached()
 
 
 import numpy as np
@@ -65,9 +53,6 @@ import pickle
 from torch.utils.data import Dataset, DataLoader, random_split
 import torchvision.transforms as transforms
 from astropy.io import fits
-
-
-# In[2]:
 
 
 class ResidualConvBlock(nn.Module):
@@ -337,8 +322,6 @@ class DDPM(nn.Module):
         return x_i, x_i_store
 
 
-# In[3]:
-
 
 # TESS Dataset
 
@@ -460,6 +443,8 @@ class TESSDataset(Dataset):
         return {"x":angles_image, "y":ffi_image, "ffi_num": ffi_num, "orbit": orbit}
 
 
+
+########## EXAMPLE CODE TO LOAD A DATASET ############
 # # MAKE DATASET
 # # we are calculating Y GIVEN X
 # angle_filename = 'angles_O11-54_data_dic.pkl'
@@ -478,8 +463,6 @@ class TESSDataset(Dataset):
 # print(tess_dataset[0]['ffi_num'])
 # print(tess_dataset[0]['orbit'])
 
-
-# In[4]:
 
 
 # angle_filename = 'angles_O11-54_data_dic.pkl'
@@ -503,10 +486,11 @@ class TESSDataset(Dataset):
 
 # # note that we only want to plot images in the validation set (unseen by model) and above the sunshade (will likely have light scatter)
 
+########## END EXAMPLE CODE TO LOAD A DATASET ############
 
-# In[5]:
 
 
+# dataset for raw original 4096x4096 TESS images
 class TESS_4096_original_images:
     def __init__(self):
         self.ffi_to_fits_filepath = {}
@@ -541,9 +525,7 @@ class TESS_4096_original_images:
         return image_tensor
 
 
-# In[6]:
-
-
+# dataset for processed 4096x4096 TESS images
 class TESS_4096_processed_images:
     def __init__(self):
         self.ffi_to_pkl_filepath = {}
@@ -561,13 +543,7 @@ class TESS_4096_processed_images:
             return pickle.load(file)
 
 
-# def get_processed_4096x4096(self, ffi_num):
-#     fits_folder
-
-
-# In[7]:
-
-
+# run function for evaluating a (single) model
 def display_TESS_single_model():
     # hardcoding these here - make sure these match the parameters of the model being loaded
     # model parameters
@@ -581,7 +557,7 @@ def display_TESS_single_model():
     # model_dir = "/pdo/users/jlupoiii/TESS/model_conditional_diffusion/model_TESS/model_TESS_O11-54_im64x64_multipleGPUs_1/"
     model_state_dic_filename = "model_epoch1499.pth"
     eval_folder = 'eval/'
-    os.makedirs(os.path.join(model_dir, eval_folder), exist_ok=True)
+    os.makedirs(os.path.join(model_dir, eval_folder), exist_ok=True) # makes eval folder
     
     # dataset parameters - eventually make it so we load validation/training set that is saved specifically to the model
     angle_filename = 'angles_O11-54_data_dic.pkl'
@@ -618,81 +594,82 @@ def display_TESS_single_model():
     # tracks losses and standard deviations for each image to see average loss
     losses = []
     sigmas = []
-    # var_scaled_RMSEs = []
+    # var_scaled_RMSEs = [] # used for errenuous calculations of var scaled rmse, will delete later
     var_scaled_RMSE_pixels_list = np.array([])
 
 
-    # ################ scatterplots ##################
-    # print('starting to make pairplot')
-    # dataset_training = TESSDataset(angle_filename=angle_filename, ccd_folder=ccd_folder, model_dir=model_dir, image_shape=image_shape, num_processes=num_processes, above_sunshade=True, validation_dataset=False)
-    # # making and saving pairplot of input data - separates training and validation data
-    # data = []
-    # for i in range(len(dataset_training)):
-    #     data.append(dataset_training[i]['x'].flatten().numpy().astype(float))
-    # for i in range(len(dataset)):
-    #     data.append(dataset[i]['x'].flatten().numpy().astype(float))
-    # df = pd.DataFrame(data)
-    # # df.columns = ['1/ED','1/MD','1/ED^2','1/MD^2','Eel','Eaz','Mel','Maz','E3el','E3az','M3el','M3az']
-    # df.columns = [r"$\frac{1}{d_E}$",r"$\frac{1}{d_M}$",r"$(\frac{1}{d_E})^2$",r"$(\frac{1}{d_M})^2$",r"$\theta_{E,sunshade}$",r"$\phi_{E,sunshade}$",r"$\theta_{M,sunshade}$",r"$\phi_{M,sunshade}$",r"$\theta_{E,camera}$",r"$\phi_{E,camera}$",r"$\theta_{M,camera}$",r"$\phi_{M,camera}$"]
+    '''
+    ################ scatterplots ##################
+    print('starting to make pairplot')
+    dataset_training = TESSDataset(angle_filename=angle_filename, ccd_folder=ccd_folder, model_dir=model_dir, image_shape=image_shape, num_processes=num_processes, above_sunshade=True, validation_dataset=False)
+    # making and saving pairplot of input data - separates training and validation data
+    data = []
+    for i in range(len(dataset_training)):
+        data.append(dataset_training[i]['x'].flatten().numpy().astype(float))
+    for i in range(len(dataset)):
+        data.append(dataset[i]['x'].flatten().numpy().astype(float))
+    df = pd.DataFrame(data)
+    # df.columns = ['1/ED','1/MD','1/ED^2','1/MD^2','Eel','Eaz','Mel','Maz','E3el','E3az','M3el','M3az']
+    df.columns = [r"$\frac{1}{d_E}$",r"$\frac{1}{d_M}$",r"$(\frac{1}{d_E})^2$",r"$(\frac{1}{d_M})^2$",r"$\theta_{E,sunshade}$",r"$\phi_{E,sunshade}$",r"$\theta_{M,sunshade}$",r"$\phi_{M,sunshade}$",r"$\theta_{E,camera}$",r"$\phi_{E,camera}$",r"$\theta_{M,camera}$",r"$\phi_{M,camera}$"]
     
-    # # fig, axs = plt.subplots(1, 4, figsize=(20, 5))
-    # fig, axs = plt.subplots(1, 4, figsize=(12, 3))
-    # sns.scatterplot(data=df[:len(dataset_training)], x=r"$(\frac{1}{d_M})^2$", y=r"$\theta_{M,camera}$", color='#1f77b4', alpha=0.4, s=10, ax=axs[0], label='Training')
-    # sns.scatterplot(data=df[len(dataset_training):], x=r"$(\frac{1}{d_M})^2$", y=r"$\theta_{M,camera}$", color='#ff7f0e', alpha=0.4, s=10, ax=axs[0], label='Validation')
-    # sns.scatterplot(data=df[:len(dataset_training)], x=r"$\phi_{E,camera}$", y=r"$\theta_{M,camera}$", color='#1f77b4', alpha=0.4, s=10, ax=axs[1])
-    # sns.scatterplot(data=df[len(dataset_training):], x=r"$\phi_{E,camera}$", y=r"$\theta_{M,camera}$", color='#ff7f0e', alpha=0.4, s=10, ax=axs[1])
-    # sns.scatterplot(data=df[:len(dataset_training)], x=r"$(\frac{1}{d_M})^2$", y=r"$\phi_{M,camera}$", color='#1f77b4', alpha=0.4, s=10, ax=axs[2])
-    # sns.scatterplot(data=df[len(dataset_training):], x=r"$(\frac{1}{d_M})^2$", y=r"$\phi_{M,camera}$", color='#ff7f0e', alpha=0.4, s=10, ax=axs[2])
-    # sns.scatterplot(data=df[:len(dataset_training)], x=r"$\frac{1}{d_M}$", y=r"$\phi_{M,sunshade}$", color='#1f77b4', alpha=0.4, s=10, ax=axs[3])
-    # sns.scatterplot(data=df[len(dataset_training):], x=r"$\frac{1}{d_M}$", y=r"$\phi_{M,sunshade}$", color='#ff7f0e', alpha=0.4, s=10, ax=axs[3])
-    # axs[0].legend().remove()
-    # handles, labels = axs[0].get_legend_handles_labels()
-    # fig.legend(handles, labels, loc='center right', bbox_to_anchor=(1.15, 0.5), fontsize=14)
-    # for ax in axs:
-    #     ax.set_xlabel(ax.get_xlabel(), fontsize=14)
-    #     ax.set_ylabel(ax.get_ylabel(), fontsize=14)    
-    # plt.tight_layout()
-    # plt.show()    
-    # fig.savefig(os.path.join(model_dir, "data_pairplot_partial.png"), bbox_inches='tight')
-    # plt.close()
-    # return
+    # fig, axs = plt.subplots(1, 4, figsize=(20, 5))
+    fig, axs = plt.subplots(1, 4, figsize=(12, 3))
+    sns.scatterplot(data=df[:len(dataset_training)], x=r"$(\frac{1}{d_M})^2$", y=r"$\theta_{M,camera}$", color='#1f77b4', alpha=0.4, s=10, ax=axs[0], label='Training')
+    sns.scatterplot(data=df[len(dataset_training):], x=r"$(\frac{1}{d_M})^2$", y=r"$\theta_{M,camera}$", color='#ff7f0e', alpha=0.4, s=10, ax=axs[0], label='Validation')
+    sns.scatterplot(data=df[:len(dataset_training)], x=r"$\phi_{E,camera}$", y=r"$\theta_{M,camera}$", color='#1f77b4', alpha=0.4, s=10, ax=axs[1])
+    sns.scatterplot(data=df[len(dataset_training):], x=r"$\phi_{E,camera}$", y=r"$\theta_{M,camera}$", color='#ff7f0e', alpha=0.4, s=10, ax=axs[1])
+    sns.scatterplot(data=df[:len(dataset_training)], x=r"$(\frac{1}{d_M})^2$", y=r"$\phi_{M,camera}$", color='#1f77b4', alpha=0.4, s=10, ax=axs[2])
+    sns.scatterplot(data=df[len(dataset_training):], x=r"$(\frac{1}{d_M})^2$", y=r"$\phi_{M,camera}$", color='#ff7f0e', alpha=0.4, s=10, ax=axs[2])
+    sns.scatterplot(data=df[:len(dataset_training)], x=r"$\frac{1}{d_M}$", y=r"$\phi_{M,sunshade}$", color='#1f77b4', alpha=0.4, s=10, ax=axs[3])
+    sns.scatterplot(data=df[len(dataset_training):], x=r"$\frac{1}{d_M}$", y=r"$\phi_{M,sunshade}$", color='#ff7f0e', alpha=0.4, s=10, ax=axs[3])
+    axs[0].legend().remove()
+    handles, labels = axs[0].get_legend_handles_labels()
+    fig.legend(handles, labels, loc='center right', bbox_to_anchor=(1.15, 0.5), fontsize=14)
+    for ax in axs:
+        ax.set_xlabel(ax.get_xlabel(), fontsize=14)
+        ax.set_ylabel(ax.get_ylabel(), fontsize=14)    
+    plt.tight_layout()
+    plt.show()    
+    fig.savefig(os.path.join(model_dir, "data_pairplot_partial.png"), bbox_inches='tight')
+    plt.close()
+    return
     
-    # source = ['Training'] * len(dataset_training) + ['Validation'] * len(dataset)
-    # df['source'] = source
-    # sns.set(font_scale=1.2, style="ticks")
-    # colors = ['#1f77b4', '#ff7f0e']
-    # sns.set_palette(sns.color_palette(colors))
-    # pairplot = sns.pairplot(df, hue='source', height=1.5, corner=True,plot_kws={"s": 3, "alpha":0.5}, diag_kind=None)
-    # pairplot._legend.set_title(' ')
-    # pairplot._legend.set_bbox_to_anchor((.6, .6))
-    # pairplot_fig = pairplot.fig
-    # # plt.legend(loc='center left', bbox_to_anchor=(0.5, 0.5))
-    # pairplot_fig.savefig(os.path.join(model_dir, "data_pairplot_full.png"))
-    # plt.show()
-    # plt.close()
-    # return
+    source = ['Training'] * len(dataset_training) + ['Validation'] * len(dataset)
+    df['source'] = source
+    sns.set(font_scale=1.2, style="ticks")
+    colors = ['#1f77b4', '#ff7f0e']
+    sns.set_palette(sns.color_palette(colors))
+    pairplot = sns.pairplot(df, hue='source', height=1.5, corner=True,plot_kws={"s": 3, "alpha":0.5}, diag_kind=None)
+    pairplot._legend.set_title(' ')
+    pairplot._legend.set_bbox_to_anchor((.6, .6))
+    pairplot_fig = pairplot.fig
+    # plt.legend(loc='center left', bbox_to_anchor=(0.5, 0.5))
+    pairplot_fig.savefig(os.path.join(model_dir, "data_pairplot_full.png"))
+    plt.show()
+    plt.close()
+    return
 
-    # KL_train = []
-    # KL_valid = []
-    # KL_divergences = np.zeros((12, 12))
-    # for i in range(len(dataset_training)):
-    #     KL_train.append(dataset_training[i]['x'].flatten().numpy().astype(float))
-    # for i in range(len(dataset)):
-    #     KL_valid.append(dataset[i]['x'].flatten().numpy().astype(float))
-    # KL_train = np.array(KL_train).T
-    # KL_valid = np.array(KL_valid).T
-    # # print(KL_train.shape)
-    # for i in range(12):
-    #     for j in range(12):
-    #         print(KL_train[i].shape)
-    #         KL_divergences[i, j] = entropy(KL_train[i], KL_valid[j])
-    #         # KL_divergences[i, j] = entropy(KL_train[i], KL_train[i])
-    # print(KL_divergences)
-    # return
-    # ################ scatterplots ##################
+    KL_train = []
+    KL_valid = []
+    KL_divergences = np.zeros((12, 12))
+    for i in range(len(dataset_training)):
+        KL_train.append(dataset_training[i]['x'].flatten().numpy().astype(float))
+    for i in range(len(dataset)):
+        KL_valid.append(dataset[i]['x'].flatten().numpy().astype(float))
+    KL_train = np.array(KL_train).T
+    KL_valid = np.array(KL_valid).T
+    # print(KL_train.shape)
+    for i in range(12):
+        for j in range(12):
+            print(KL_train[i].shape)
+            KL_divergences[i, j] = entropy(KL_train[i], KL_valid[j])
+            # KL_divergences[i, j] = entropy(KL_train[i], KL_train[i])
+    print(KL_divergences)
+    return
+    ################ scatterplots ##################
+    '''
 
     torch.cuda.empty_cache()
-
     ddpm.eval()
     with torch.no_grad():
         count = 0
@@ -709,6 +686,7 @@ def display_TESS_single_model():
             x = data_dic['y'].to(device) # .to(device) has to do with CPU and the GPU
             c = data_dic['x'].to(device)
 
+            # To display processed image
             # img = plt.imshow(x[0][0].cpu() * 633118, cmap='gray', vmin=0, vmax=633118)
             # plt.title(f"Processed Image\nffi {ffi_num}")
             # # plt.axis('off')
@@ -720,8 +698,6 @@ def display_TESS_single_model():
             torch.cuda.empty_cache()
 
             print(f'beginnging evaluation for ffi number {ffi_num}, orbit {orbit}')
-
-            # start_time = time.time()
     
             # generate samples using model, each sample is an x_i
             x_gen, x_gen_store = ddpm.sample_c(c, N, (1, image_shape[0], image_shape[1]), device)
@@ -734,58 +710,42 @@ def display_TESS_single_model():
             # get processed 4096x4096 image
             X_proc_4096 = ffi_to_4096processedimage[ffi_num]
             X_proc_4096 = torch.tensor(X_proc_4096)
-            
-            # ############## GIFS #############
-            # # only animates a single sample(don't need 100!)
-            # x_gen_store = x_gen_store[:, 0:1, :, :, :]
-            # # create gif of images evolving over time, based on x_gen_store
-            # fig, axs = plt.subplots(nrows=1, ncols=1,sharex=True,sharey=True, figsize=(8,8))# ,figsize=(8,3))
-            # def animate_diff(i, x_gen_store):
-            #     print(f'gif animating frame {i} of {x_gen_store.shape[0]}', end='\r')
-            #     img = axs.imshow(x_gen_store[i, 0, 0], cmap='gray', vmin=0, vmax=1)
-            #     axs.set_xticks([])
-            #     axs.set_yticks([])
-            #     return img,
-            # ani = FuncAnimation(fig, animate_diff, fargs=[np.clip(x_gen_store, 0, 1)],  interval=200, blit=False, repeat=True, frames=x_gen_store.shape[0]) 
-            # save_file = os.path.join(model_dir, eval_folder, f"gif_sample_{ffi_num}_{count}.gif")
-            # ani.save(save_file, dpi=100, writer=PillowWriter(fps=5))
-            # print('Done animating GIF')
-            # ############## GIFS #############
 
+            '''
+            ############## makes GIFS #############
+            # only animates a single sample(don't need 100!)
+            x_gen_store = x_gen_store[:, 0:1, :, :, :]
+            # create gif of images evolving over time, based on x_gen_store
+            fig, axs = plt.subplots(nrows=1, ncols=1,sharex=True,sharey=True, figsize=(8,8))# ,figsize=(8,3))
+            def animate_diff(i, x_gen_store):
+                print(f'gif animating frame {i} of {x_gen_store.shape[0]}', end='\r')
+                img = axs.imshow(x_gen_store[i, 0, 0], cmap='gray', vmin=0, vmax=1)
+                axs.set_xticks([])
+                axs.set_yticks([])
+                return img,
+            ani = FuncAnimation(fig, animate_diff, fargs=[np.clip(x_gen_store, 0, 1)],  interval=200, blit=False, repeat=True, frames=x_gen_store.shape[0]) 
+            save_file = os.path.join(model_dir, eval_folder, f"gif_sample_{ffi_num}_{count}.gif")
+            ani.save(save_file, dpi=100, writer=PillowWriter(fps=5))
+            print('Done animating GIF')
+            ############## makes GIFS (end) #############
+            '''
+
+            # taking mean and std dev of all predictions (downsampled)
             bar_x = torch.mean(x_gen.cpu(), dim=0) # Mean prediction for model's predictions
-
             sigma_x = torch.std(x_gen.cpu(), dim=0) # Standard deviation of prediction
 
             # upscale generated samples. Using linear interpolation
             order = 1 # degree of interpolation. 1 is linear
             x_gen_upsampled = scipy.ndimage.zoom(x_gen.cpu(), (1, 1, 4096//image_shape[0], 4096//image_shape[0]), order=order)
             x_gen_upsampled = torch.tensor(x_gen_upsampled)
-            
+
+            # taking mean and std dev of all upsampled predictions
             bar_x_upsampled = torch.mean(x_gen_upsampled, dim=0) # Mean prediction for upsampled predictions
             sigma_x_upsampled = torch.std(x_gen_upsampled, dim=0) # Standard deviation of upsampled prediction
-
-            # end_time = time.time()
-            # print(f"mid time {(end_time - mid_time)/N} end time {(end_time - start_time)/N}")
-
-
-            ### JUNK #####
-            # avg_pred_RMSE_Loss = torch.sqrt(torch.mean(((X_proc_4096 - bar_x_upsampled)[0])**2)) # RMSE for average upsampled predicted image
-            # avg_ffi_RMSE_Loss = torch.sqrt(torch.mean((X_proc_4096[0])**2)) # RMSE for average upsampled predicted image
-            # avg_std_dev = torch.mean(sigma_x_upsampled)
-            # ## Variance scaled RMSE
-            # error = torch.mean((X_proc_4096 - bar_x_upsampled)[0])
-
-            # # saves txt file with info about evals
-            # with open(os.path.join(model_dir, eval_folder, 'eval_info.txt'), 'a') as f:
-            #     f.write(f"ffi,RMSE,avg_std_dev,ffi_RMSE,error \t {ffi_num} \t {avg_pred_RMSE_Loss} \t {avg_std_dev} \t {avg_ffi_RMSE_Loss} \t {error} \n")
-            #     print('saved eval_info info')
-            # continue
-            ### JUNK #####
+        
 
             
-
-            
-            #### Variance scaled error calculations ####
+            #### Variance scaled error calculations, makes histogram ####
             starting = time.time()
             var_scaled_RMSE_pixels = ((bar_x_upsampled[0] - X_proc_4096) / sigma_x_upsampled[0]).flatten().numpy()
             var_scaled_RMSE_pixels_list = np.append(var_scaled_RMSE_pixels_list, var_scaled_RMSE_pixels)
@@ -799,158 +759,163 @@ def display_TESS_single_model():
             plt.savefig(os.path.join(model_dir, eval_folder, 'uncertainty_scaled_error.pdf'))
             # print('saved temp hist')
             plt.close()
+            print(f'Time in seconds to make histogram: {time.time()-starting}')
+            #### Variance scaled error calculations, makes histogram  (end) ######
 
-            print(f'seconds for histogram: {time.time()-starting}')
-
+            
             continue
             
 
-            # # calculate var scaled rmse for each image, then add to a list for all predictions
-            # var_scaled_RMSE_image = float(torch.mean((bar_x_upsampled[0] - X_proc_4096) / sigma_x_upsampled[0]))
-            # var_scaled_RMSEs.append(var_scaled_RMSE_image)
+            '''
+            ######## errenuous code that calculated variance scaled rmse, will delete later ###########
+            # calculate var scaled rmse for each image, then add to a list for all predictions
+            var_scaled_RMSE_image = float(torch.mean((bar_x_upsampled[0] - X_proc_4096) / sigma_x_upsampled[0]))
+            var_scaled_RMSEs.append(var_scaled_RMSE_image)
 
-            # # plot and save var scaled rmse histogram
-            # counts, bin_edges = np.histogram(var_scaled_RMSEs, bins=80)
-            # normalized_counts = counts / counts.max()
-            # plt.figure(figsize=(10, 6))
-            # plt.bar(bin_edges[:-1], normalized_counts, width=np.diff(bin_edges), edgecolor='green', alpha=0.5, color='green')
-            # temp = np.linspace(bin_edges[0], bin_edges[-1], 100)
-            # normal_curve = norm.pdf(temp, 0, 1)
-            # plt.plot(temp, normal_curve, 'k--', linewidth=2)  # Dashed black line
-            # plt.xlabel('Uncertainty Scaled RMSE', fontsize=14)
-            # plt.subplots_adjust(bottom=0.2)
-            # plt.savefig(os.path.join(model_dir, eval_folder, 'uncertainty_scaled_error.pdf'))
-            # plt.show()
-            # plt.close()
-            # print(f'number of samples in var scaled rmse histogram: {len(var_scaled_RMSEs)}')
+            # plot and save var scaled rmse histogram
+            counts, bin_edges = np.histogram(var_scaled_RMSEs, bins=80)
+            normalized_counts = counts / counts.max()
+            plt.figure(figsize=(10, 6))
+            plt.bar(bin_edges[:-1], normalized_counts, width=np.diff(bin_edges), edgecolor='green', alpha=0.5, color='green')
+            temp = np.linspace(bin_edges[0], bin_edges[-1], 100)
+            normal_curve = norm.pdf(temp, 0, 1)
+            plt.plot(temp, normal_curve, 'k--', linewidth=2)  # Dashed black line
+            plt.xlabel('Uncertainty Scaled RMSE', fontsize=14)
+            plt.subplots_adjust(bottom=0.2)
+            plt.savefig(os.path.join(model_dir, eval_folder, 'uncertainty_scaled_error.pdf'))
+            plt.show()
+            plt.close()
+            print(f'number of samples in var scaled rmse histogram: {len(var_scaled_RMSEs)}')
 
-            #### end of variance scaled error calculations ####
+            ######## errenuous code that calculated variance scaled rmse, will delete later (end) ###########
+            '''
+            
+            losses.append(torch.mean(bar_x_upsampled))
+            sigmas.append(torch.max(sigma_x_upsampled))
+            print('average losses so far', np.mean(losses))
+            print('average max std dev so far', np.mean(sigmas))
 
-            continue
+            '''
+            ############# Displays evaluation images, separately ###########
+            # Original Image
+            # Processed Image
+            # Prediction Image (just plot the mean)
+            img = plt.imshow(X, cmap='gray', vmin=0, vmax=1)
+            plt.title(f"Original Image\nffi {ffi_num}")
+            # plt.axis('off')
+            plt.colorbar(img, fraction=0.04)
+            plt.show()
+            plt.close()
+            img = plt.imshow(x[0][0].cpu() * 633118, cmap='gray', vmin=0, vmax=633118)
+            plt.title(f"Processed Image\nffi {ffi_num}")
+            # plt.axis('off')
+            plt.colorbar(img, fraction=0.04)
+            plt.show()
+            plt.close()
+            img = plt.imshow(x_gen[0][0].cpu(), cmap='gray', vmin=0, vmax=1)
+            plt.title(f"Model Prediction\nffi {ffi_num}")
+            # plt.axis('off')
+            plt.colorbar(img, fraction=0.04)
+            plt.show()
+            plt.close()
+            img = plt.imshow(x_gen_upsampled[0][0].cpu(), cmap='gray', vmin=0, vmax=1)
+            plt.title(f"Upsampled Prediction\nffi {ffi_num}")
+            # plt.axis('off')
+            plt.colorbar(img, fraction=0.04)
+            plt.show()
+            plt.close()
+            img = plt.imshow(x_gen_upsampled[0][0].cpu() * 633118, cmap='gray', vmin=0, vmax=633118)
+            plt.title(f"Upsampled Scaled Prediction\nffi {ffi_num}")
+            # plt.axis('off')
+            plt.colorbar(img, fraction=0.04)
+            plt.show()
+            plt.close()
+            ############# Displays evaluation images, separately (end)###########
+            '''
+
 
             
-            # losses.append(avg_pred_RMSE_Loss)
-            # sigmas.append(torch.max(sigma_x_upsampled))
-            # print('average losses so far', np.mean(losses))
-            # print('average max std dev so far', np.mean(sigmas))
+
+            '''
+            ####### plots 10 evaluation images in a neat grid, used in presentation ##########
+            # make plot of each image 
+            fig, axes = plt.subplots(2, 5, figsize=(18, 12)) # , subplot_kw={'aspect': 'equal'})
+            fig.suptitle(f"{image_shape[0]}x{image_shape[1]} Model Performance\nOrbit {orbit}, ffi number {ffi_num}\n{N} sample predictions\nAverage Prediction MSE Loss: {avg_pred_RMSE_Loss:.2e}", fontsize = 25)
+
+            # X
+            img0 = axes[0,0].imshow(X, cmap='gray', vmin=0, vmax=1)
+            axes[0,0].set_title(r"$X$" + "\nOriginal Image")
+            fig.colorbar(img0, ax=axes[0,0], fraction=0.04)
+
+            # X_proc_4096
+            img1 = axes[0,1].imshow(X_proc_4096, cmap='gray', vmin=0, vmax=1)
+            axes[0,1].set_title(r"$X_{proc,4096}$" + "\n4096x4096 Processed Image")
+            fig.colorbar(img1, ax=axes[0,1], fraction=0.04)
+
+            # X-X_proc_4096
+            img2 = axes[0,2].imshow(X-X_proc_4096, cmap='gray', vmin=0, vmax=1)
+            axes[0,2].set_title(r"$X-X_{proc,4096}$" + "\nProcessed Removed\nScattered Light")
+            fig.colorbar(img2, ax=axes[0,2], fraction=0.04)
+
+            # X_proc
+            img3 = axes[0,3].imshow(x[0][0].cpu(), cmap='gray', vmin=0, vmax=1)
+            axes[0,3].set_title(r"$X_{proc}$" + f"\n{image_shape[0]}x{image_shape[0]} Processed Image")
+            fig.colorbar(img3, ax=axes[0,3], fraction=0.04)
             
-            # #### For displaying purposes ####
-            # # Original Image
-            # # Processed Image
-            # # Prediction Image (just plot the mean)
-            # img = plt.imshow(X, cmap='gray', vmin=0, vmax=1)
-            # plt.title(f"Original Image\nffi {ffi_num}")
-            # # plt.axis('off')
-            # plt.colorbar(img, fraction=0.04)
-            # plt.show()
-            # plt.close()
-            # img = plt.imshow(x[0][0].cpu() * 633118, cmap='gray', vmin=0, vmax=633118)
-            # plt.title(f"Processed Image\nffi {ffi_num}")
-            # # plt.axis('off')
-            # plt.colorbar(img, fraction=0.04)
-            # plt.show()
-            # plt.close()
-            # img = plt.imshow(x_gen[0][0].cpu(), cmap='gray', vmin=0, vmax=1)
-            # plt.title(f"Model Prediction\nffi {ffi_num}")
-            # # plt.axis('off')
-            # plt.colorbar(img, fraction=0.04)
-            # plt.show()
-            # plt.close()
-            # img = plt.imshow(x_gen_upsampled[0][0].cpu(), cmap='gray', vmin=0, vmax=1)
-            # plt.title(f"Upsampled Prediction\nffi {ffi_num}")
-            # # plt.axis('off')
-            # plt.colorbar(img, fraction=0.04)
-            # plt.show()
-            # plt.close()
-            # img = plt.imshow(x_gen_upsampled[0][0].cpu() * 633118, cmap='gray', vmin=0, vmax=633118)
-            # plt.title(f"Upsampled Scaled Prediction\nffi {ffi_num}")
-            # # plt.axis('off')
-            # plt.colorbar(img, fraction=0.04)
-            # plt.show()
-            # plt.close()
-            # #### For displaying purposes ####
-            # continue
-            # #### end of For displaying purposes ####
+            # bar(x)
+            img4 = axes[0,4].imshow(bar_x[0], cmap='gray', vmin=0, vmax=1)
+            axes[0,4].set_title(r"$\bar{x}$" + "\nMean Prediction")
+            fig.colorbar(img4, ax=axes[0,4], fraction=0.04)
 
+            # sigma_x
+            img5 = axes[1,0].imshow(sigma_x[0], cmap='gray')
+            axes[1,0].set_title(r"$\sigma_x$" + "\nStandard Deviation\nof Prediction")
+            fig.colorbar(img5, ax=axes[1,0], fraction=0.04)
 
+            # bar(x)_up
+            img6 = axes[1,1].imshow(bar_x_upsampled[0], cmap='gray', vmin=0, vmax=1)
+            axes[1,1].set_title(r"$\bar{x}_{up}$" + "\nMean Upsampled Prediction")
+            fig.colorbar(img6, ax=axes[1,1], fraction=0.04)
             
+            # sigma_x_up
+            img7 = axes[1,2].imshow(sigma_x_upsampled[0], cmap='gray')
+            axes[1,2].set_title(r"$\sigma_{x, up}$" + "\nStandard Deviation\nof Upsampled Prediction")
+            fig.colorbar(img7, ax=axes[1,2], fraction=0.04)
 
-            
-            # ####### plots 10 images ##########
-            # # make plot of each image 
-            # fig, axes = plt.subplots(2, 5, figsize=(18, 12)) # , subplot_kw={'aspect': 'equal'})
-            # fig.suptitle(f"{image_shape[0]}x{image_shape[1]} Model Performance\nOrbit {orbit}, ffi number {ffi_num}\n{N} sample predictions\nAverage Prediction MSE Loss: {avg_pred_RMSE_Loss:.2e}", fontsize = 25)
-
-            # # X
-            # img0 = axes[0,0].imshow(X, cmap='gray', vmin=0, vmax=1)
-            # axes[0,0].set_title(r"$X$" + "\nOriginal Image")
-            # fig.colorbar(img0, ax=axes[0,0], fraction=0.04)
-
-            # # X_proc_4096
-            # img1 = axes[0,1].imshow(X_proc_4096, cmap='gray', vmin=0, vmax=1)
-            # axes[0,1].set_title(r"$X_{proc,4096}$" + "\n4096x4096 Processed Image")
-            # fig.colorbar(img1, ax=axes[0,1], fraction=0.04)
-
-            # # X-X_proc_4096
-            # img2 = axes[0,2].imshow(X-X_proc_4096, cmap='gray', vmin=0, vmax=1)
-            # axes[0,2].set_title(r"$X-X_{proc,4096}$" + "\nProcessed Removed\nScattered Light")
-            # fig.colorbar(img2, ax=axes[0,2], fraction=0.04)
-
-            # # X_proc
-            # img3 = axes[0,3].imshow(x[0][0].cpu(), cmap='gray', vmin=0, vmax=1)
-            # axes[0,3].set_title(r"$X_{proc}$" + f"\n{image_shape[0]}x{image_shape[0]} Processed Image")
-            # fig.colorbar(img3, ax=axes[0,3], fraction=0.04)
-            
-            # # bar(x)
-            # img4 = axes[0,4].imshow(bar_x[0], cmap='gray', vmin=0, vmax=1)
-            # axes[0,4].set_title(r"$\bar{x}$" + "\nMean Prediction")
-            # fig.colorbar(img4, ax=axes[0,4], fraction=0.04)
-
-            # # sigma_x
-            # img5 = axes[1,0].imshow(sigma_x[0], cmap='gray')
-            # axes[1,0].set_title(r"$\sigma_x$" + "\nStandard Deviation\nof Prediction")
-            # fig.colorbar(img5, ax=axes[1,0], fraction=0.04)
-
-            # # bar(x)_up
-            # img6 = axes[1,1].imshow(bar_x_upsampled[0], cmap='gray', vmin=0, vmax=1)
-            # axes[1,1].set_title(r"$\bar{x}_{up}$" + "\nMean Upsampled Prediction")
-            # fig.colorbar(img6, ax=axes[1,1], fraction=0.04)
-            
-            # # sigma_x_up
-            # img7 = axes[1,2].imshow(sigma_x_upsampled[0], cmap='gray')
-            # axes[1,2].set_title(r"$\sigma_{x, up}$" + "\nStandard Deviation\nof Upsampled Prediction")
-            # fig.colorbar(img7, ax=axes[1,2], fraction=0.04)
+            # X_proc - bar(x)_up
+            img8 = axes[1,3].imshow(X_proc_4096-bar_x_upsampled[0], cmap='gray')
+            axes[1,3].set_title(r"$X_{proc,4096} - \bar{x}_{up}$" + "\nMean Upsampled Prediction Error")
+            fig.colorbar(img8, ax=axes[1,3], fraction=0.04)
 
             # # X_proc - bar(x)_up
-            # img8 = axes[1,3].imshow(X_proc_4096-bar_x_upsampled[0], cmap='gray')
-            # axes[1,3].set_title(r"$X_{proc,4096} - \bar{x}_{up}$" + "\nMean Upsampled Prediction Error")
+            # img8 = axes[1,3].imshow(X_proc-bar_x_upsampled[0], cmap='gray')
+            # axes[1,3].set_title(r"$X_{proc} - \bar{x}_{up}$" + "\nMean Upsampled Prediction Error\n(colorbar scaled)")
             # fig.colorbar(img8, ax=axes[1,3], fraction=0.04)
 
-            # # # X_proc - bar(x)_up
-            # # img8 = axes[1,3].imshow(X_proc-bar_x_upsampled[0], cmap='gray')
-            # # axes[1,3].set_title(r"$X_{proc} - \bar{x}_{up}$" + "\nMean Upsampled Prediction Error\n(colorbar scaled)")
-            # # fig.colorbar(img8, ax=axes[1,3], fraction=0.04)
-
-            # # X - bar(x)
-            # img9 = axes[1,4].imshow(X-bar_x_upsampled[0], cmap='gray', vmin=0, vmax=1)
-            # axes[1,4].set_title(r"$X - \bar{x}_{up}$" + "\nMean Upsampled Predicted\nRemoved Scattered Light")
-            # fig.colorbar(img9, ax=axes[1,4], fraction=0.04)
+            # X - bar(x)
+            img9 = axes[1,4].imshow(X-bar_x_upsampled[0], cmap='gray', vmin=0, vmax=1)
+            axes[1,4].set_title(r"$X - \bar{x}_{up}$" + "\nMean Upsampled Predicted\nRemoved Scattered Light")
+            fig.colorbar(img9, ax=axes[1,4], fraction=0.04)
             
-            # # Adjust layout
-            # plt.tight_layout()
+            # Adjust layout
+            plt.tight_layout()
             
-            # # Show the plot
-            # plt.show()
+            # Show the plot
+            plt.show()
             
-            # # save images
-            # plt.tight_layout()
-            # fig.savefig(os.path.join(model_dir, eval_folder, f"eval_eval_{ffi_num}_{count}.pdf"))
-            # print('saved image at ' + os.path.join(model_dir, eval_folder, f"eval_{ffi_num}_{count}.pdf"))
-            # plt.close()
-            # ####### end of plots 10 images ##########
+            # save images
+            plt.tight_layout()
+            fig.savefig(os.path.join(model_dir, eval_folder, f"eval_eval_{ffi_num}_{count}.pdf"))
+            print('saved image at ' + os.path.join(model_dir, eval_folder, f"eval_{ffi_num}_{count}.pdf"))
+            plt.close()
+            ####### plots 10 evaluation images in a neat grid, used in presentation (end) ##########
+            '''
 
 
-            ####### plots 7 images for paper ##########
+
+
+            '''
+            ####### plots 7 evaluation images in a neat grid, used in paper (end) ##########
             # make plot of each image 
             fig, axes = plt.subplots(2, 4, figsize=(18, 9)) # , subplot_kw={'aspect': 'equal'})
             # fig.suptitle(f"{image_shape[0]}x{image_shape[1]} Model Performance\nOrbit {orbit}, ffi number {ffi_num}\n{N} sample predictions\nAverage Prediction MSE Loss: {avg_pred_RMSE_Loss:.2e}", fontsize = 25)
@@ -1006,30 +971,23 @@ def display_TESS_single_model():
             fig.savefig(os.path.join(model_dir, eval_folder, f"eval_{ffi_num}_{count}.pdf"))
             print('saved image at ' + os.path.join(model_dir, eval_folder, f"eval_{ffi_num}_{count}.pdf"))
             plt.close()
-            ####### end of plots 7 images for paper ##########
+            ####### plots 10 evaluation images in a neat grid, used in presentation (end) ##########
+            '''
 
             count += 1
             # if count == 100: break
             
 
 if __name__ == "__main__":
-    
     os.environ['CUDA_LAUNCH_BLOCKING'] = '1'
     os.environ["TORCH_USE_CUDA_DSA"] = "1"
-
     display_TESS_single_model()
+    
     
 
 
-# In[ ]:
-
-
-
-
-
-# In[13]:
-
-
+'''
+########## code for comparing two different models of 2 different sizes ###############
 # can ignore this
 def display_TESS_two_models():
 
@@ -1147,7 +1105,6 @@ def display_TESS_two_models():
             avg_pred_RMSE_Loss_128 = torch.std((X_proc_upsampled_128 - bar_x_128)[0])
             
             # make plot of each image 
-            # fig, axes = plt.subplots(2, 7, figsize=(18, 6)) # , subplot_kw={'aspect': 'equal'})
             fig, axes = plt.subplots(2, 7, figsize=(18, 12)) # , subplot_kw={'aspect': 'equal'})
 
             fig.suptitle(f"Model Performance\nOrbit {orbit} , FFI Number {ffi_num}\n{N} Sample Predictions\n64x64 Model Average Prediction MSE Loss: {avg_pred_RMSE_Loss_64:.3e}\n128x128 Model Average Prediction MSE Loss: {avg_pred_RMSE_Loss_128:.3e}", fontsize = 25)
@@ -1250,44 +1207,11 @@ def display_TESS_two_models():
 
             count += 1
             if count == 100: break
-            
 
 if __name__ == "__main__":
     display_TESS_two_models()
 
-
-# In[7]:
-
-
-# noise_image = np.random.rand(128, 128)
-
-# # Create a new figure without axes
-# plt.figure(figsize=(4, 4))  # Adjust figsize as needed
-# plt.imshow(noise_image, cmap='gray')
-# plt.axis('off')  # Turn off axes
-# plt.show()
-
-
-loss_window = [5,1,0.5,1,3,9,0.5][-5:]
-stop_early = (loss_window[0] == min(loss_window)) if len(loss_window)>=5 else False
-
-print(stop_early)
-
-
-# In[9]:
-
-
-for i in range(10):
-    with torch.no_grad():
-        print("Iteration:", i)
-        if i == 5:
-            break
-
-print("Outside loop")
-
-
-# In[ ]:
-
-
+########## code for comparing two different models of 2 different sizes (end) ###############
+'''
 
 
