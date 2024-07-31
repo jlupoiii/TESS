@@ -135,7 +135,8 @@ class EmbedFC(nn.Module):
 
 class ContextUnet(nn.Module):
     # def __init__(self, in_channels, n_feat = 256, n_classes=10):
-    def __init__(self, in_channels, n_feat = 256):
+    # def __init__(self, in_channels, n_feat = 256):
+    def __init__(self, in_channels, in_dim, n_feat = 256):
         super(ContextUnet, self).__init__()
 
         self.in_channels = in_channels
@@ -152,8 +153,10 @@ class ContextUnet(nn.Module):
         self.timeembed2 = EmbedFC(1, 1*n_feat)
         self.timeembed1 = EmbedFC(1, 2*n_feat)
         self.timeembed2 = EmbedFC(1, 1*n_feat)
-        self.contextembed1 = EmbedFC(12, 2*n_feat)
-        self.contextembed2 = EmbedFC(12, 1*n_feat)
+        # self.contextembed1 = EmbedFC(12, 2*n_feat) # for imput of 12 dim
+        # self.contextembed2 = EmbedFC(12, 1*n_feat) # for imput of 12 dim
+        self.contextembed1 = EmbedFC(in_dim, 2*n_feat) # for imput of any dim
+        self.contextembed2 = EmbedFC(in_dim, 1*n_feat) # for imput of any dim
 
         self.up0 = nn.Sequential(
             nn.ConvTranspose2d(2 * n_feat, 2 * n_feat, 4, 4), # otherwise just have 2*n_feat
@@ -180,10 +183,12 @@ class ContextUnet(nn.Module):
         down2 = self.down2(down1)
         hiddenvec = self.to_vec(down2)
 
-        c = c.reshape((c.shape[0], 12))
+        # c = c.reshape((c.shape[0], 12)) # for input of 12 angles
+        c = c.reshape((c.shape[0], (c.shape)[2]))
         
         # mask out context if context_mask == 1
-        context_mask = context_mask.reshape((x.shape[0], 12))
+        # context_mask = context_mask.reshape((x.shape[0], 12)) # for input of 12 angles        
+        context_mask = context_mask.reshape((x.shape[0], c.shape[1])) # for input of any size
         context_mask = (-1*(1-context_mask)) # need to flip 0 <-> 1
         c = c * context_mask
 
@@ -391,7 +396,6 @@ class TESSDataset(Dataset):
 
         self.angles_dic = pickle.load(open(self.angle_folder+angle_filename, "rb"))
 
-
         files = []
         for filename in os.listdir(self.ccd_folder):
             if filename[18:18+8] in self.angles_dic.keys():
@@ -432,7 +436,8 @@ class TESSDataset(Dataset):
         except KeyError:
             return None, None, None
             
-        x = np.array([angles['1/ED'], angles['1/MD'], angles['1/ED^2'], angles['1/MD^2'], angles['Eel'], angles['Eaz'], angles['Mel'], angles['Maz'], angles['E3el'], angles['E3az'], angles['M3el'], angles['M3az']])
+        # x = np.array([angles['1/ED'], angles['1/MD'], angles['1/ED^2'], angles['1/MD^2'], angles['Eel'], angles['Eaz'], angles['Mel'], angles['Maz'], angles['E3el'], angles['E3az'], angles['M3el'], angles['M3az']]) # for inputs of 12 values
+        x = np.array([angles['1/ED'], angles['1/MD'], angles['1/ED^2'], angles['1/MD^2'], angles['Eel'], angles['Eaz'], angles['Mel'], angles['Maz']]) # for inputs of 8 values
         x = Image.fromarray(x)
         y = image_arr.flatten()
         y = Image.fromarray(y)
@@ -450,9 +455,12 @@ class TESSDataset(Dataset):
         ffi_num = self.ffi_nums[idx]
         orbit = self.angles_dic[ffi_num]["orbit"]
 
+        # print('hereeee', angles_image.size)
+        # print('hereeee2', type(angles_image.size))
+
         transform = transforms.Compose([
             transforms.ToTensor(),
-            lambda s: s.reshape(1, 12)
+            lambda s: s.reshape(1, (angles_image.size)[1]) # for inputs of any number of values
         ])
         target_transform = transforms.Compose([
             lambda s: np.array(s),
@@ -488,8 +496,8 @@ class TESSDataset(Dataset):
 # MODEL TRAINING
 
 # hardcoding these here
-n_epoch = 1500
-batch_size = 8
+n_epoch = 1000
+batch_size = 16
 train_ratio = 0.8
 n_T = 600 # 400
 n_feat = 256 # 128 ok, 256 better (but slower)
@@ -497,14 +505,15 @@ lrate = 1e-4
 save_model = True
 epoch_checkpoint = 100
 checkpoint_gpu = 0
-patience = 20 # for early stopping
+patience = 150 # for early stopping
 
 # dataset parameters
-save_dir = 'model_TESS_O11-54_im128x128_multipleGPUs_splitOrbits_earlyStop/'
+save_dir = 'model_TESS_O11-54_8values_im64x64_multipleGPUs_earlyStop/'
 os.makedirs(save_dir, exist_ok=True)
-angle_filename = 'angles_O11-54_data_dic.pkl'
-ccd_folder = "/pdo/users/jlupoiii/TESS/data/processed_images_im128x128/"
-image_shape = (128,128)
+# angle_filename = "angles_O11-54_nonoversaturateorbits_data_dic.pkl"
+angle_filename = "angles_O11-54_8values_data_dic.pkl"
+ccd_folder = "/pdo/users/jlupoiii/TESS/data/processed_images_im64x64/"
+image_shape = (64,64)
 num_processes = 80
 
 # saves txt file with info about model parameters
@@ -523,23 +532,20 @@ with open(os.path.join(save_dir, 'model_info.txt'), 'w') as f:
 
 tess_dataset = TESSDataset(angle_filename, ccd_folder, image_shape, num_processes)
 
-# # randomly separate data into training and validation sets
-# # train:20768, valid:5192 - random
-# num_train_samples = int(train_ratio * len(tess_dataset))
-# num_valid_samples = len(tess_dataset) - num_train_samples
-# train_dataset, valid_dataset = random_split(tess_dataset, [num_train_samples, num_valid_samples])
+# randomly separate data into training and validation sets
+# train:20768, valid:5192 - random
+num_train_samples = int(train_ratio * len(tess_dataset))
+num_valid_samples = len(tess_dataset) - num_train_samples
+train_dataset, valid_dataset = random_split(tess_dataset, [num_train_samples, num_valid_samples])
 
-# separate data into training and validation sets by orbit. training: 11-46, validation: 47-54
-# train:21021, valid:4939 - by orbit, <= 46 and > 46
-train_indices = [idx for idx, data_point in enumerate(tess_dataset) if int(data_point["orbit"]) <= 46]
-valid_indices = [idx for idx, data_point in enumerate(tess_dataset) if int(data_point["orbit"]) > 46]
-train_dataset = Subset(tess_dataset, train_indices)
-valid_dataset = Subset(tess_dataset, valid_indices)
-num_train_samples = len(train_indices)
-num_valid_samples = len(valid_indices)
-
-# train_dataloader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True, num_workers=0, drop_last=True)
-# valid_dataloader = DataLoader(valid_dataset, batch_size=batch_size, shuffle=True, num_workers=0, drop_last=True)
+# # separate data into training and validation sets by orbit. training: 11-46, validation: 47-54
+# # train:21021, valid:4939 - by orbit, <= 47 and > 47
+# train_indices = [idx for idx, data_point in enumerate(tess_dataset) if int(data_point["orbit"]) <= 47]
+# valid_indices = [idx for idx, data_point in enumerate(tess_dataset) if int(data_point["orbit"]) > 47]
+# train_dataset = Subset(tess_dataset, train_indices)
+# valid_dataset = Subset(tess_dataset, valid_indices)
+# num_train_samples = len(train_indices)
+# num_valid_samples = len(valid_indices)
 
 # saving datapoints that are in training set vs validation set.
 training_dataset_ffis = [train_dataset[index]['ffi_num'] for index in range(len(train_dataset))]
@@ -581,9 +587,11 @@ def train(rank, world_size):
 
     
     print(f"GPU of rank {rank} has {len(train_dataloader)} training batches and {len(valid_dataloader)} validation batches")
+    
+    in_dim = next(iter(valid_dataloader))['x'].shape[2]
 
     # Create model and optimizer
-    ddpm = DDPM(nn_model=ContextUnet(in_channels=1, n_feat=n_feat), betas=(1e-4, 0.02), n_T=n_T, device=device, drop_prob=0.1)
+    ddpm = DDPM(nn_model=ContextUnet(in_channels=1, in_dim = in_dim, n_feat=n_feat), betas=(1e-4, 0.02), n_T=n_T, device=device, drop_prob=0.1)
     ddpm = nn.parallel.DistributedDataParallel(ddpm, device_ids=[rank])
     
     optim = torch.optim.Adam(ddpm.parameters(), lr=lrate)
