@@ -1,0 +1,36 @@
+# Default configuration for BEAM model training
+
+# Model parameters
+model:
+  n_T: 600               # Number of diffusion timesteps
+  n_feat: 256            # Number of features in U-Net
+  betas: [0.0001, 0.02]    # Beta schedule start and end values
+  drop_prob: 0.1         # Dropout probability for classifier-free guidance
+  
+# Data parameters  
+data:
+  angle_filename: "angles_O11-54_data_dic.pkl"   # Filename for angle data
+  ccd_folder: "/pdo/users/jlupoiii/TESS/data/processed_images_im64x64/"  # Folder containing processed images
+  image_shape: [64, 64]  # Shape of the images
+  num_processes: 80      # Number of processes for parallel loading
+  
+# Training parameters
+training:
+  n_epoch: 1000          # Maximum number of epochs
+  batch_size: 16         # Batch size
+  lrate: 0.0001            # Learning rate
+  patience: 150          # Early stopping patience
+  
+# Checkpoint parameters
+checkpoint:
+  save_model: true       # Save model checkpoints
+  epoch_checkpoint: 100  # Save samples every N epochs
+  checkpoint_gpu: 0      # GPU ID to use for checkpoints
+  
+# Paths
+paths:
+  save_dir: "model_outputs/TESS_diffusion/"  # Directory to save model and results
+  
+# Distributed training
+distributed:
+  world_size: null       # Number of GPUs (null = auto-detect)

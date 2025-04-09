@@ -1,4 +1,63 @@
-# ignore pushing these files
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
 
-data/Preprocessing_im128x128.ipynb 
+# Distribution / packaging
+.env
+env/
+venv/
+ENV/
+env.bak/
+venv.bak/
 
+# Unit test / coverage reports
+htmlcov/
+.tox/
+.coverage
+.coverage.*
+.cache
+nosetests.xml
+coverage.xml
+*.cover
+.hypothesis/
+
+# Jupyter Notebook
+.ipynb_checkpoints
+
+# VS Code
+.vscode/
+*.code-workspace
+
+# Project specific
+model_outputs/
+generated_samples/
+logs/
+*.pth
+*.pt
+*.pkl
+*.h5
+*.ckpt
+*.pdf
+archived/archived_runs
+
+# Data files
+*.fits
+*.fits.gz

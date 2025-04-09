@@ -1,5 +1,5 @@
 ''' 
-This script does conditional image generation on MNIST, using a diffusion model
+This script does conditional image generation on TESS FFIs, using a diffusion model
 
 This code is modified from,
 https://github.com/cloneofsimo/minDiffusion
@@ -15,7 +15,7 @@ https://arxiv.org/abs/2205.11487
 
 '''
 
-from utils import *
+from utils_joey import *
 
 # # @title TESS Dataset
 class TESSDataset(Dataset):
@@ -297,7 +297,7 @@ def train(rank, world_size):
                 print(f'Running checkpoint at epoch {ep} on GPU {checkpoint_gpu}')
                 
                 n_datapoint = min(10, batch_size) # want at most 10 and at least batch_size datapoints
-                n_sample = 5
+                n_sample = 40
                 
                 def sample_save_plots(x_real, c_real, ffi_nums_real, orbits_real, train_or_valid_string):
 
