@@ -1,142 +1,118 @@
 # BEAM: Background Elimination with Advanced Machine learning
 
-BEAM is a Python package for training and using conditional diffusion models to model and remove systematic effects from image data. 
+BEAM is a Python package for training and using conditional diffusion models to model and remove systematic effects from image data.
 
-This project models the shape and intensity of scattered light in TESS (Transiting Exoplanet Survey Satellite) full frame image (FFIs) conditioned on orbital parameters.
-
-## Overview
-
-BEAM uses conditional denoising diffusion probabilistic models (cDDPMs) to model the shape and intensity of scattered light in TESS full frame image (FFIs) conditioned on orbital parameters.
+This project models the shape and intensity of scattered light in TESS (Transiting Exoplanet Survey Satellite) full frame images (FFIs), conditioned on the positions of the Earth and Moon relative to the spacecraft. Given only that geometry, a trained model generates the expected scattered-light image for an FFI.
 
 ## Installation
 
-### From Source
+Tested with Python 3.11, PyTorch 2.4.1 and CUDA 12.1. Generation needs a GPU in practice: on 4 CPU cores a single 256×256 frame takes more than 10 minutes.
+
+With conda:
 
 ```bash
-git clone https://github.com/yourusername/BEAM.git
+git clone https://github.com/daniel-muthukrishna/BEAM.git
 cd BEAM
+conda env create -f environment.yaml
+conda activate beam
 pip install -e .
 ```
 
-### Requirements
-
-- Python 3.8+
-- PyTorch 1.9+
-- See requirements.txt for full dependencies
-
-## Project Structure
-
-```
-BEAM/
-├── beam/                           # Main package
-│   ├── models/                     # Model implementations
-│   ├── data/                       # Dataset and data loading
-│   ├── training/                   # Training functionality
-│   └── utils/                      # Utilities
-├── configs/                        # Configuration files
-├── scripts/                        # Command-line scripts
-└── tests/                          # Unit tests
-```
-
-## Usage
-
-### Training a Model
+Or with pip only (Python 3.11):
 
 ```bash
-python scripts/train.py --config configs/default_config.yaml
+git clone https://github.com/daniel-muthukrishna/BEAM.git
+cd BEAM
+pip install -r requirements.txt
+pip install -e .
 ```
 
-### Generating Images
+## Pretrained model
+
+The [releases page](https://github.com/daniel-muthukrishna/BEAM/releases) has a trained model for TESS camera 3 and the angle file it needs:
+
+- **Model folder**, containing:
+  - `config.yaml`: the architecture and data settings the model was trained with
+  - `context_stats.pkl`: the mean and standard deviation used to standardize the geometry features
+  - `image_stats.pkl`: the mean and standard deviation used to normalize the images
+  - `checkpoint_epoch_final_*.pth`: the trained weights, including the EMA weights used by default
+- **`angles_O11-116_allcams_data_FIXED.pkl`**: Earth and Moon geometry for every FFI in orbits 11–116 (sectors 2–54), all cameras.
+
+The model generates 256×256 images of camera 3. It was trained on orbits 11–45 and validated on orbits 46–54; predictions for later orbits are extrapolations.
+
+## Generating scattered-light images
 
 ```bash
-python scripts/generate.py --model_path model_outputs/TESS_diffusion/model_epoch100.pth --n_samples 10
+python scripts/generate.py --config configs/generation_config.yaml \
+    --model_dir /path/to/model_folder \
+    --angle_path /path/to/angles_O11-116_allcams_data_FIXED.pkl \
+    --sector 10
 ```
 
-### Using the API
+- `--sector N` generates every FFI of sector N in the angle file (sector N = orbits 2N+7 and 2N+8). Use `--ffi-nums 00123456 00123457 ...` for specific FFIs instead.
+- `--limit N` generates only the first N selected FFIs, for a quick test.
+- `--device cpu` (or `cuda:1`, ...) picks the device; `--devices cuda:0 cuda:1` runs one worker per GPU.
+- `--output_dir` sets where the files go (default: `<model_dir>/generated`).
+- `--guidance_scale`, `--seed`, `--batch_size`, `--checkpoint` and `--no-ema` can be set on the command line or in `configs/generation_config.yaml`.
 
-```python
-import torch
-from beam.models.unet import ContextUnet
-from beam.models.diffusion import DDPM
+Each FFI is written to `generated_light_s<sector>-<ffi>-cam<camera>.fits` in electrons per second, with the FFI number, orbit, sector and sampler settings in the FITS header. `generation_preview.png` shows up to 16 of the generated images.
 
-# Create model
-unet = ContextUnet(in_channels=1, in_dim=12, n_feat=256)
-model = DDPM(nn_model=unet, betas=(1e-4, 0.02), n_T=600, device=device)
+Only FFIs listed in the angle file can be generated, since the model's input is that file's geometry for each FFI.
 
-# Load trained weights
-model.load_state_dict(torch.load("model_path.pth"))
+## Conditioning
 
-# Generate samples
-params = torch.rand((5, 1, 12))  # 5 sets of orbital parameters
-samples, _ = model.sample_c(params, n_sample=1, size=(1, 64, 64), device=device)
-```
+Each FFI is described by 12 geometry parameters:
 
-## Data
+- the inverse Earth and Moon distances, and their squares (4)
+- the Earth and Moon elevation and azimuth (4)
+- the Earth and Moon elevation and azimuth relative to the camera (4)
 
-The model is trained on TESS Full Frame Images and the corresponding orbital parameters of the Earth and the Moon reletive to the satellite. The data should be organized as follows:
+Azimuths are encoded as sine and cosine, giving 16 features, which are standardized with the training-set statistics saved in `context_stats.pkl`. See `build_context_features` in `beam/data/datasets.py`.
 
-<!-- - Orbital parameters: Stored in pickle files in the format specified by the `TESSDataset` class
-- TESS images: Processed and stored in pickle files in the specified directory
+## Model
 
-For more information on the data format, see the documentation in `beam/data/datasets.py`. -->
+`ContextUnet` (`beam/models/unet.py`) is a U-Net whose residual blocks are modulated by a single embedding of the diffusion time, the camera and the geometry features, with self-attention at the lower resolutions.
 
-## Model Architecture
+`ScoreMatch` (`beam/models/interpolant.py`) trains it with flow matching on a straight path from noise to image (`architecture: flow`). Images are generated by integrating the learned velocity field with an adaptive ODE solver (dopri5), optionally with classifier-free guidance (`--guidance_scale`). The `noise`, `score` and `v` architectures use a variance-preserving path and an SDE sampler instead.
 
-BEAM uses a conditional UNet architecture with the following key components:
+## Training
 
-- **ContextUnet**: A U-Net with context embeddings for conditioning on orbital parameters
-- **DDPM**: Denoising Diffusion Probabilistic Model implementation
-- **Classifier-Free Guidance**: To control the influence of the conditioning signal
+Training needs an angle file and processed images, made with the scripts in `data/`. Set the paths in `data/config/preprocess_config.yaml` first.
 
-The model generates images through an iterative denoising process, starting from random noise and gradually refining it based on the conditioning information.
+1. **Angles.** `data/process_angles.py` turns per-orbit `O<orbit>_altaz.out` tables (not included in this repository) into the angle file:
 
-## Configuration
+   ```bash
+   python data/process_angles.py --config data/config/preprocess_config.yaml
+   ```
 
-BEAM uses YAML configuration files to manage training and generation parameters. See `configs/default_config.yaml` for an example configuration with documentation.
+2. **Images.** `data/preprocess_all.py` turns TICA FFIs (available from MAST as a High Level Science Product), stored in one subfolder per orbit, into the processed images the model trains on. Set `image_size` to the resolution you want to train at (the pretrained model uses 256).
 
-Key configuration sections include:
+   ```bash
+   python data/preprocess_all.py --config data/config/preprocess_config.yaml
+   ```
 
-- **model**: Model architecture and diffusion process parameters
-- **data**: Dataset specifications and preprocessing settings
-- **training**: Training hyperparameters and optimization settings
-- **checkpoint**: Saving and loading behavior
-- **distributed**: Multi-GPU training configuration
+3. **Train.** Set `data.angle_path` and `data.ccd_folder` in `configs/sm_config.yaml`, then:
 
-## Distributed Training
+   ```bash
+   python scripts/train.py --config configs/sm_config.yaml
+   ```
 
-BEAM supports distributed training across multiple GPUs:
+   - Training logs to Weights & Biases by default; add `--wandb offline` or `--wandb disabled` to change that.
+   - `distributed.world_size` sets the number of GPUs.
+   - `data.valid_orbits` sets which orbits are held out for validation; every other orbit trains.
+   - `--resume path/to/checkpoint.pth` resumes a run.
+   - Checkpoints, `config.yaml`, `context_stats.pkl` and `image_stats.pkl` are saved to `paths.save_dir`. That folder is what `generate.py --model_dir` expects.
 
-```bash
-# Automatically use all available GPUs
-python scripts/train.py --config configs/default_config.yaml
-
-# Resume training from a checkpoint
-python scripts/train.py --config configs/default_config.yaml --resume model_outputs/TESS_diffusion/model_epoch50.pth
-```
-
-## Citation
-
-If you use BEAM in your research, please cite it as follows:
+## Repository layout
 
 ```
-@software{beam2023,
-  author = {Muthukrishna, D., Lupo, J., Vanderspek, R.},
-  title = {BEAM: Background Elimination with Advanced Machine Learning},
-  year = {2025},
-  url = {https://github.com/daniel-muthukrishna/BEAM}
-}
+beam/
+  data/        dataset and geometry features
+  models/      U-Net, training objective, probability paths, samplers
+  training/    training loop, multi-GPU training, callbacks, W&B logging
+  utils/       config loading, plotting, W&B helpers
+configs/       training (sm_config.yaml) and generation (generation_config.yaml) settings
+data/          preprocessing: TICA FFIs -> training images, altaz tables -> angle file
+scripts/       train.py, generate.py
 ```
-
-## License
-
-This project is licensed under the MIT License - see the LICENSE file for details.
-
-## Acknowledgments
-
-- The TESS mission for providing the data
-- The diffusion model implementation is adapted from research from Ho et al. (DDPM) 
-    - DDPM: https://arxiv.org/abs/2006.11239
-    - Classifier-Free Diffusion Guidance: https://arxiv.org/abs/2207.12598
-- The diffusion model code is adapted from: https://github.com/TeaPearce/Conditional_Diffusion_MNIST
-which was originally modified from: https://github.com/cloneofsimo/minDiffusion
 

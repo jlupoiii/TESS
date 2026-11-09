@@ -1,21 +1,24 @@
 #Path to the root directory containing orbit subfolders with FITS files
-fits_folder: /pdo/qlp-data/tica-delivery/
+fits_folder: /path/to/tica_ffis/
+
+#Folder containing the raw O<orbit>_altaz.out angle files (used by process_angles.py)
+raw_angles_folder: /path/to/altaz_files/
 
 #Output folder for processed angle data
-angle_folder: /pdo/users/djtufto/angles
+angle_folder: /path/to/angles/
 
 #Output folder for processed CCD images
-ccd_folder: /pdo/users/djtufto/cam3/tica_sector30
+ccd_folder: /path/to/processed_images/
 
 #Output folder for background images
-background_ccd_folder: /pdo/users/djtufto/cam3/bg4096
+background_ccd_folder: /path/to/background_images/
 
 #Processed angle dictionary pickle to load from angle_folder
 angles_dic: angles_O11-116_cam_ALL_data_dic_full.pkl
 
 #(Optional) folder for saving debug images ('' to disable)
 display_images_folder: ''
-#Target image size 
+#Target image size
 
 image_size: 4096
 

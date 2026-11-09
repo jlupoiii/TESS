@@ -1,30 +1,5 @@
 """
-Weights & Biases callback — V2.
-
-Self-contained: subclasses only the shared `Callback` base, so it has no
-dependency on the V1 callback module. It began as a subclass of V1's
-WeightsAndBiasesCallback; `__init__`, `on_epoch_begin` and `on_batch_end` are
-copied from it verbatim, and the rest carries three fixes found in the
-pipeline audit (each marked "UPDATE" at the relevant site):
-
- 1. Per-t-bin validation losses. The V2 trainer puts 'valid_loss_t_bin_i'
-    (and 'best_valid_loss') into the epoch logs; the V1 callback logs a fixed
-    key set and would silently drop them.
-
- 2. FIXED model logging. V1's wandb_utils.log_model() saved the checkpoint to
-    the current working directory, handed it to wandb.save() — which only
-    creates a symlink into the run dir for ASYNC upload — and then immediately
-    deleted the file. The upload raced a dangling symlink, so model files
-    never reliably reached W&B. It also merged the EMA dict INTO the model
-    state dict (`model_state |= ema.state_dict()`), mixing 'shadow'/'beta'/
-    'step' keys among the weight tensors. V2 saves directly into wandb.run.dir
-    (never deleted; uploaded with policy="now") and nests the EMA under its
-    own 'ema_state_dict' key, matching the on-disk checkpoint format.
-
- 3. DDP-correct step axis. V1 computed steps_per_epoch as
-    len(train_dataset) // batch_size, which overcounts by world_size when each
-    rank sees 1/world_size of the data — the W&B step axis drifted ahead of
-    the true optimizer step count. V2 uses len(trainer.train_loader).
+Weights & Biases callback 
 """
 
 import os
@@ -95,9 +70,6 @@ class WeightsAndBiasesCallback(Callback):
 
         print(f"Initialized W&B logging with run name: {self.model_name}")
 
-        # UPDATE (fix 3): per-rank optimizer steps per epoch. V1 used
-        # len(trainer.train_dataset) // training_batch_size, which overcounts
-        # by world_size under DDP and drifts the W&B step axis.
         self.steps_per_epoch = len(trainer.train_loader)
         if trainer.current_epoch > 0:
             self.current_step = trainer.current_epoch * self.steps_per_epoch
@@ -106,9 +78,7 @@ class WeightsAndBiasesCallback(Callback):
         """Reset batch counter at the beginning of each epoch."""
         self.batch_count = 0
 
-    # ------------------------------------------------------------------
-    # UPDATE (fix 2): reliable model logging
-    # ------------------------------------------------------------------
+    #unused
     def _log_model_fixed(self, trainer: Any, name: str) -> None:
         # model = trainer.model.module if hasattr(trainer.model, 'module') else trainer.model
         # state = {
@@ -141,9 +111,7 @@ class WeightsAndBiasesCallback(Callback):
             }
             if hasattr(trainer, 'optimizer'):
                 metrics["learning_rate"] = trainer.optimizer.param_groups[0]['lr']
-            # UPDATE (fix 1): forward the V2 trainer's extra diagnostics
-            # (per-t-bin losses + per-t-bin flux errors; sigma-binned variants
-            # exist only for VP-path uniform_sigma runs).
+
             metrics.update({k: v for k, v in logs.items()
                             if k.startswith(("valid_loss_t_bin_", "valid_flux_err_t_bin_",
                                              "valid_loss_sigma_bin_", "valid_flux_err_sigma_bin_"))})
@@ -153,7 +121,7 @@ class WeightsAndBiasesCallback(Callback):
         except Exception as e:
             print(f"Warning: Failed to log epoch metrics to W&B: {e}")
 
-        # Sample images (unchanged from V1)
+        # Sample images
         if epoch % self.log_samples_freq == 0 or epoch == trainer.config['training_n_epoch'] - 1:
             try:
                 model = trainer.model.module if hasattr(trainer.model, 'module') else trainer.model
@@ -178,7 +146,7 @@ class WeightsAndBiasesCallback(Callback):
             except Exception as e:
                 print(f"Warning: Failed to log sample images to W&B: {e}")
 
-        # Model weights (UPDATE fix 2: fixed saver)
+        # Model weights 
         if epoch % self.log_model_freq == 0 or epoch == trainer.config['training_n_epoch'] - 1:
             try:
                 self._log_model_fixed(trainer, f"model_epoch_{epoch}")

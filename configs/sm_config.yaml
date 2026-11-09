@@ -25,9 +25,9 @@ model:
 # Data parameters
 data:
 
-  angle_path: /pdo/users/djtufto/angles_O11-116_allcams_data_FIXED.pkl
+  angle_path: /path/to/angles.pkl  # Angle dictionary from data/process_angles.py
   ccd_folder:
-    - /pdo/users/djtufto/cam3/tica/O11-116/256x256  # Folder containing processed images
+    - /path/to/processed_images_256x256  # Folder containing processed images
   image_shape: [256,256] # Shape of the images
   patch_size: null       # Shape of the patches; null for no patches
   repeat_factor: 1       # Iterate repeat_factor times over the dataset each epoch
@@ -79,16 +79,16 @@ load_checkpoint: null
 # Weights & Biases parameters
 wandb:
   enabled: True          # Enable W&B logging
-  project: "beam-tess"   # W&B project name
+  project: "PROJECT_NAME"   # W&B project name
   mode: "online"         # W&B mode (online, offline, disabled)
   log_freq: 20           # Log batch metrics every N batches (higher value = less traffic)
   log_samples_freq: 100  # Log sample images every N epochs
   log_model_freq: 100    # Log model weights every N epochs
-  model_name: "Camera_3_tica_flow_256x256" # Base name for the model and W&B run
+  model_name: "MODEL_NAME" # Base name for the model and W&B run
 
 # Paths
 paths:
-  save_dir: "model_outputs/cam3_tica_flow_256x256"  # Directory to save model and results
+  save_dir: "model_outputs/DESIRED_PATH"  # Directory to save model and results
 
 # Distributed training
 distributed:

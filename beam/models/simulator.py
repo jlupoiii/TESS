@@ -145,10 +145,6 @@ def guided_output(
 ):
     """
     One classifier-free-guided evaluation of the network.
-
-    The conditional and unconditional branches are stacked into a single batch,
-    so this costs one forward pass over 2B samples. `cam` is only forwarded when
-    it is provided, so models whose forward() has no camera argument still work.
     """
     context_mask = torch.cat([torch.zeros_like(c), torch.ones_like(c)], dim=0)
     c_in = torch.cat([c, c], dim=0)
@@ -171,8 +167,6 @@ class ODE():
                  cam: Optional[torch.Tensor] = None):
         self.nn_model = nn_model
         self.guidance_value = guidance_value
-        # Camera index is constant along a trajectory, so it is held here rather
-        # than threaded through the simulator's per-step signature.
         self.cam = cam
 
     def velocity_field(self,x: torch.Tensor, c: Optional[torch.Tensor], t: torch.Tensor,):
@@ -203,7 +197,7 @@ class SDE():
         self.alpha = probability_path.alpha
         self.beta = probability_path.beta
         self.guidance_value = guidance_value
-        # Default diffusion coefficient g(t) = beta(t): noise vanishes as t -> 1 (data).
+        # Default diffusion coefficient g(t) = beta(t)
         self.sigma = sigma if sigma is not None else probability_path.beta
         self.architecture = architecture
         self.cam = cam
@@ -216,7 +210,7 @@ class SDE():
         """
         Convert a guided network output at (x, t) into the implied clean image
         x1_hat and noise eps_hat, using the parametrization the model was
-        trained with. x_t = alpha*x1 + beta*eps throughout.
+        trained with.
         """
         alpha = self.alpha(t)
         beta = self.beta(t)
@@ -245,9 +239,7 @@ class SDE():
         else:  # 'score': out = grad_x log p_t(x) = -eps / beta
             eps = -beta.clamp_min(1e-6) * out
 
-        # x1 from eps is the only inversion that divides by alpha; near t=0 it is
-        # ill-conditioned for these two parametrizations (intrinsically so — at
-        # pure noise the clean image is undetermined).
+    
         x1 = (x - beta * eps) / alpha.clamp_min(1e-6)
         return x1, eps
 

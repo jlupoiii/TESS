@@ -122,17 +122,16 @@ def main() -> None:
         description="Process raw TESS angle .out files into an angle dictionary pickle."
     )
     parser.add_argument("--config", type=str, help="Optional YAML config file")
-    parser.add_argument("--raw_angles_folder", default="/pdo/users/djtufto/altazzes_new/altazzes/", type=str, help="Folder containing O*_altaz.out files")
+    parser.add_argument("--raw_angles_folder", type=str, help="Folder containing O*_altaz.out files")
     parser.add_argument("--angle_folder", type=str, help="Output folder for processed angle data")
     parser.add_argument(
         "--angle_file",
-        default="angles_O11-116_cam_3_data_dic_full.pkl",
         type=str,
         help="Output pickle filename. Falls back to config key 'angles_dic'.",
     )
     parser.add_argument("--orbit_start", type=int, help="First orbit number to process")
     parser.add_argument("--orbit_end", type=int, help="Last orbit number to process")
-    parser.add_argument("--camera_number", type=str, default="3", help="Camera number 1-4, or 'all' to store every camera's columns in one dic")
+    parser.add_argument("--camera_number", type=str, help="Camera number 1-4, or 'all' to store every camera's columns in one dic")
     parser.add_argument(
         "--skip_orbits",
         type=int,
@@ -152,7 +151,7 @@ def main() -> None:
     angle_file = _config_value(config, args, "angle_file", config.get("angles_dic"))
     orbit_start = _config_value(config, args, "orbit_start")
     orbit_end = _config_value(config, args, "orbit_end")
-    camera_number = _config_value(config, args, "camera_number", "1")
+    camera_number = _config_value(config, args, "camera_number")
     skip_orbits = _config_value(config, args, "skip_orbits", [])
 
     missing = [
@@ -163,6 +162,7 @@ def main() -> None:
             "angle_file": angle_file,
             "orbit_start": orbit_start,
             "orbit_end": orbit_end,
+            "camera_number": camera_number,
         }.items()
         if value is None
     ]

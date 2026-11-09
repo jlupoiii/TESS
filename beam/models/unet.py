@@ -1,42 +1,5 @@
 """
-U-Net architecture components for the diffusion model — V2.
-
-Drop-in replacement for beam/models/unet.py. Class names are unchanged
-(ContextUnet, etc.) so integration is an import swap.
-
-Summary of updates vs unet.py (each marked "UPDATE" at the relevant site):
-
- 1. TokenizeContext now adds a learned per-parameter identity embedding to each
-    context token. Previously every scalar was projected by the same Linear(1->D)
-    with no identity, so cross-attention keys could not encode WHICH parameter a
-    token was (e.g. Moon azimuth vs Earth elevation) — only its magnitude.
-
- 2. Learned null-context vector for classifier-free guidance. Previously the
-    unconditional branch was `c * 0`, which collides with legitimate zero values
-    of the (raw or standardized) parameters. Dropped samples now see a learned
-    vector instead.
-
- 3. Conditioning is fused ONCE into a single embedding (time + camera + context)
-    and applied with per-block adaLN-Zero FiLM:
-      - every ResidualConvBlock owns its own modulation MLP (previously FiLM MLPs
-        were shared across all blocks with the same channel count, so equal-width
-        blocks at different depths received identical modulation),
-      - modulation is x * (1 + scale) + shift with the modulation MLP
-        zero-initialized (adaLN-Zero, from the DiT paper), so every block starts
-        as an identity w.r.t. conditioning instead of x * (random small scale),
-      - context now reaches EVERY residual block (previously only the first
-        block of each stage got context; later blocks got time only).
-
- 4. 2D sin-cos positional embeddings are added to tokens before attention.
-    Previously attention had no positional signal beyond what conv features
-    implicitly carry, weakening any spatially-selective use of the context.
-
- 5. Cross-attention is now behind a `use_cross_attn` flag so FiLM-only vs
-    FiLM+cross-attention can be A/B tested. When False, no cross-attention
-    parameters are created at all.
-
- 6. The final output conv is zero-initialized (standard diffusion practice;
-    the network starts by predicting 0 and learns residuals from there).
+U-Net architecture components for the diffusion model 
 """
 import math
 import torch
@@ -72,9 +35,7 @@ class FourierEncoder(nn.Module):
 
 def posemb_sincos_2d(h: int, w: int, dim: int, device) -> torch.Tensor:
     """
-    UPDATE (new): standard ViT-style 2D sin-cos positional embedding.
-    Returns (h*w, dim) float32. Added to tokens before attention so that
-    attention weights can depend on image position explicitly.
+    Standard ViT-style 2D sin-cos positional embedding.
     """
     assert dim % 4 == 0, (
         f"posemb_sincos_2d requires channel dim divisible by 4, got {dim}. "
@@ -94,7 +55,6 @@ def posemb_sincos_2d(h: int, w: int, dim: int, device) -> torch.Tensor:
 
 
 class AttentionFFN(nn.Module):
-    """Unchanged from unet.py (GeGLU feed-forward)."""
     def __init__(self, dim, hidden_dim):
         super().__init__()
         self.linear1 = nn.Linear(dim, hidden_dim * 2)
@@ -110,7 +70,6 @@ class AttentionFFN(nn.Module):
 
 
 class SelfAttention(nn.Module):
-    """Unchanged from unet.py."""
     def __init__(self, dim, heads=4):
         super().__init__()
         self.dim = dim
@@ -122,7 +81,6 @@ class SelfAttention(nn.Module):
 
 
 class CrossAttention(nn.Module):
-    """Unchanged from unet.py."""
     def __init__(self, dim, context_dim=128, heads=4):
         super().__init__()
         self.dim = dim
@@ -136,13 +94,6 @@ class CrossAttention(nn.Module):
 
 
 class AttentionBlock(nn.Module):
-    """
-    UPDATE: two changes vs unet.py
-      - 2D sin-cos positional embedding added to tokens before self-attention
-        (also benefits the cross-attention queries, which follow).
-      - cross-attention is optional (use_cross_attn); when disabled the layers
-        are not created, saving parameters and compute.
-    """
     def __init__(self, dim, context_dim, mlp_dim, heads=4, use_cross_attn=True):
         super().__init__()
         self.dim = dim
@@ -215,18 +166,7 @@ class AttentionBlock(nn.Module):
 
 class ResidualConvBlock(nn.Module):
     """
-    UPDATE: rebuilt conditioning pathway (adaLN-Zero style).
-
-    vs unet.py:
-      - takes ONE fused conditioning embedding `emb` (time + camera + context)
-        instead of separate (c, tin, tout) tensors,
-      - owns its own modulation MLPs (film1/film2) instead of receiving
-        modulation computed by MLPs shared across all same-width blocks,
-      - modulation is x * (1 + scale) + shift with zero-initialized MLPs, so at
-        init the block ignores conditioning instead of multiplying features by
-        a random near-zero scale,
-      - because `emb` contains the context, EVERY residual block is now
-        context-conditioned (previously only the first block per stage).
+    Main Unet Block
     """
     def __init__(self, in_channels: int, out_channels: int, emb_dim: int) -> None:
         super().__init__()
@@ -248,7 +188,6 @@ class ResidualConvBlock(nn.Module):
         self.skip_conv = (nn.Conv2d(in_channels, out_channels, kernel_size=1, stride=1, padding=0)
                           if not self.same_channels else nn.Identity())
 
-        # UPDATE: per-block modulation MLPs, zero-initialized (adaLN-Zero).
         self.film1 = nn.Sequential(nn.SiLU(), nn.Linear(emb_dim, 2 * in_channels))
         self.film2 = nn.Sequential(nn.SiLU(), nn.Linear(emb_dim, 2 * out_channels))
         nn.init.zeros_(self.film1[-1].weight)
@@ -256,8 +195,7 @@ class ResidualConvBlock(nn.Module):
         nn.init.zeros_(self.film2[-1].weight)
         nn.init.zeros_(self.film2[-1].bias)
 
-        # Start learning from identity: resnet(x) = x  (kept from unet.py; bias
-        # is now also zeroed for a clean identity at init)
+        # Start learning from identity
         nn.init.zeros_(self.conv2[-1].weight)
         nn.init.zeros_(self.conv2[-1].bias)
 
@@ -266,7 +204,6 @@ class ResidualConvBlock(nn.Module):
         # emb: (B, emb_dim) — fused time + camera + context embedding
         scale1, shift1 = self.film1(emb).view(-1, 2 * self.in_channels, 1, 1).chunk(2, dim=1)
         h = self.norm1(x)
-        # UPDATE: (1 + scale) convention — identity at init since scale==0.
         h = h * (1 + scale1) + shift1
         h = self.conv1(h)
 
@@ -280,9 +217,7 @@ class ResidualConvBlock(nn.Module):
 
 class UnetDown(nn.Module):
     """
-    UPDATE: simplified conditioning interface. All residual blocks receive the
-    fused `emb` (so context reaches every block); attention blocks receive the
-    tokenized context (or None when cross-attention is disabled).
+    Downsampling half of unet
     """
     def __init__(self, in_channels: int, out_channels: int, emb_dim: int,
                  num_heads: int = None, context_dim: int = 256, num_res: int = 2,
@@ -317,8 +252,6 @@ class UnetDown(nn.Module):
 
         for block in self.rem_blocks:
             if isinstance(block, ResidualConvBlock):
-                # UPDATE: context now reaches residual blocks 2+ (via emb);
-                # previously they received time-only modulation.
                 x = block(x, emb)
             else:
                 x = block(x, c_attn)
@@ -392,28 +325,17 @@ class TokenizeContext(nn.Module):
     """
     Turns a context vector of shape (B, context_len) into (B, context_len,
     context_dim) tokens for cross-attention.
-
-    UPDATE: each token now gets a learned per-parameter identity embedding.
-    Previously all scalars went through the same Linear(1->D) with no identity,
-    so keys/values could not encode WHICH parameter a token represented — the
-    context behaved as an unordered set of anonymous numbers, and queries could
-    not attend to (say) the Moon terms specifically.
-
-    NOTE the constructor signature change: `context_len` is now the ACTUAL
-    number of context entries (e.g. 16), not 1 as it was effectively called
-    with in unet.py.
     """
     def __init__(self, context_len: int, context_dim: int):
         super().__init__()
         self.context_len = context_len
         self.context_dim = context_dim
-        # Shared scalar -> vector lift (same role as before)
+        # Shared scalar -> vector lift 
         self.net = nn.Sequential(
             nn.Linear(1, context_dim),
             nn.SiLU(),
             nn.Linear(context_dim, context_dim),
         )
-        # UPDATE: learned identity embedding per parameter index.
         self.param_embed = nn.Parameter(torch.randn(context_len, context_dim) * 0.02)
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
@@ -423,7 +345,6 @@ class TokenizeContext(nn.Module):
 
 
 class EmbedFC(nn.Module):
-    """Unchanged from unet.py (kept for the conditioning trunk MLPs)."""
     def __init__(self, input_dim: int, emb_dim: int):
         super().__init__()
         self.input_dim = input_dim
@@ -439,13 +360,6 @@ class EmbedFC(nn.Module):
 
 
 class ConditioningEmbedding(nn.Module):
-    """
-    UPDATE (new): fuses time, camera, and context into ONE embedding vector that
-    feeds every block's adaLN-Zero modulation. This replaces build_film_mlps()
-    (per-channel-count shared MLPs) from unet.py: the shared trunk lives here,
-    and each ResidualConvBlock derives its own (scale, shift) from the fused
-    embedding with its own zero-initialized head.
-    """
     def __init__(self, time_dim: int, context_len: int, emb_dim: int, num_cameras: int):
         super().__init__()
         self.time_fourier = FourierEncoder(time_dim)
@@ -466,13 +380,7 @@ class ConditioningEmbedding(nn.Module):
 
 class ContextUnet(nn.Module):
     """
-    Same external interface as unet.py's ContextUnet:
-        forward(x, c, t, context_mask, cam=None)
-    with c: (B, 1, context_len), context_mask: 1 = drop conditioning.
-
-    New constructor args:
-        emb_dim        — width of the fused conditioning embedding (default 256)
-        use_cross_attn — enable/disable cross-attention for A/B testing
+    Main Class
     """
     def __init__(self, in_feats, context_len,
                  n_feat=64, time_dim=128, context_dim=64, emb_dim=256,
@@ -488,17 +396,11 @@ class ContextUnet(nn.Module):
         self.heads_at = heads_at
         self.use_cross_attn = use_cross_attn
 
-        # UPDATE: single fused conditioning embedding (replaces build_film_mlps
-        # and the separate time/context FiLM dictionaries).
         self.cond_embed = ConditioningEmbedding(time_dim, context_len, emb_dim, num_cameras)
 
-        # UPDATE: learned null context for classifier-free guidance. Dropped
-        # samples get this vector instead of zeros, so "unconditional" no longer
-        # collides with physically-valid zero parameter values.
+        #learned null embedding
         self.null_context = nn.Parameter(torch.zeros(context_len))
 
-        # UPDATE: tokenizer now receives the true context length and adds
-        # per-parameter identity embeddings. Only built when cross-attn is on.
         if use_cross_attn:
             self.attn_context_embed = TokenizeContext(context_len, context_dim)
 
@@ -535,23 +437,19 @@ class ContextUnet(nn.Module):
             nn.SiLU(),
             nn.Conv2d(in_channels=prev_ch, out_channels=1, kernel_size=3, stride=1, padding=1)
         )
-        # UPDATE: zero-init the output conv (standard diffusion practice).
         nn.init.zeros_(self.out[-1].weight)
         nn.init.zeros_(self.out[-1].bias)
 
     def forward(self, x, c, t, context_mask, cam=None):
         x = self.init_conv(x)
 
-        # Flatten context and mask to (B, context_len); mask semantics unchanged
-        # (1 = drop conditioning for that sample).
+        # Flatten context and mask to (B, context_len)
         c = c.reshape(c.shape[0], c.shape[2])
         context_mask = context_mask.reshape(c.shape[0], c.shape[1])
 
-        # UPDATE: dropped samples get the learned null vector, not zeros.
         c = c * (1 - context_mask) + self.null_context.view(1, -1) * context_mask
 
-        # UPDATE: one fused embedding drives all FiLM modulation. Camera flows
-        # through here exactly as before (added to the time pathway).
+     
         emb = self.cond_embed(t, c, cam)
 
         c_attn = self.attn_context_embed(c) if self.use_cross_attn else None

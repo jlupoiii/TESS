@@ -1,42 +1,4 @@
 #!/usr/bin/env python
-"""
-BEAM: Background Elimination with Advanced Machine learning - Generation Script
-
-Generates scattered-light images directly from a trained model using the
-ODE (architecture 'flow', adaptive dopri5) or SDE (architectures 'noise' /
-'score' / 'v', Euler-Maruyama) form of the model.
-
-Paths and sampling knobs live in the generation config
-(configs/generation_config.yaml, 'generation:' section); every value there can
-be overridden on the command line. Everything model-related is read from the
-model's output directory:
-    <model_dir>/config.yaml          - architecture, unet hyperparameters,
-                                       angle path, camera, image shape
-    <model_dir>/context_stats.pkl    - conditioning normalization (train orbits)
-    <model_dir>/image_stats.pkl      - image mean/std for de-normalization
-    <model_dir>/checkpoint_*.pth     - weights (EMA by default)
-
-FFIs are selected either by --sector (all FFIs in the angles dict belonging to
-that sector's two orbits: 2s+7 and 2s+8) or by explicit --ffi-nums. The
-conditioning vector for each FFI is built from the angles dict with the exact
-training-time encoding (datasets.build_context_features + saved stats).
-
-Parallelism:
-    --devices cuda:0 cuda:1 ...   one worker process per GPU, the selected
-                                  FFIs split evenly between them
-    --num-shards N --shard-index i   this invocation only handles every N-th
-                                  FFI starting at i (for splitting across
-                                  nodes / separate launches); composes with
-                                  --devices, which further splits the shard
-
-Examples:
-    python scripts/generate.py --sector 30
-    python scripts/generate.py --sector 30 --devices cuda:0 cuda:1 cuda:2
-    # node A / node B:
-    python scripts/generate.py --sector 30 --num-shards 2 --shard-index 0
-    python scripts/generate.py --sector 30 --num-shards 2 --shard-index 1
-"""
-
 import os
 import glob
 import pickle

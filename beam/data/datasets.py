@@ -9,7 +9,6 @@ Conditioning encoding feature layout: (16 features, standardized to zero mean / 
 
 Patch-location conditioning: row/col sin-cos embedding
 
-Angles are ALWAYS radians
 """
 
 import os
@@ -87,12 +86,7 @@ class TESSDataset(Dataset):
 
         self.add_exposure_flag = add_exposure_flag
         self.normalize_context = normalize_context
-        # Sky normalization: per-SECTOR scalar sky level (native pkl units)
-        # subtracted at load time. Sky is constant within a sector to <2 e/s
-        # but spans ~0.03-0.10 across sectors; subtracting it makes a smooth
-        # pedestal out-of-distribution instead of "some other sector's
-        # zodiacal level". Sector comes from the angle data:
-        # sector = (orbit - 7) // 2.
+    
         self.zero_context = zero_context
         self.sky_by_sector = ({int(k): float(v) for k, v in sky_by_sector.items()}
                               if sky_by_sector is not None else None)
@@ -206,10 +200,7 @@ class TESSDataset(Dataset):
             flag = 1.0 if int(orbit) >= 61 else -1.0
             context = torch.cat([context, torch.tensor([flag], dtype=torch.float32)])
 
-        # np.load memory-maps true .npy files (patch mode then reads only the
-        # patch's pages) but silently ignores mmap_mode for legacy pickle files
-        # and falls back to a full 64 MB unpickle — convert with
-        # scripts/convert_pkl_to_npy.py to get the fast path.
+
         image_arr = np.load(file_path, mmap_mode='r', allow_pickle=True)
 
         # Apply patch if patch_size is not None
@@ -228,9 +219,6 @@ class TESSDataset(Dataset):
         ffi_image = (torch.from_numpy(arr).unsqueeze(0) - self.MEAN) / self.STD
 
         if self.zero_context:
-            # Unconditional model (e.g. the star prior): the image must not be
-            # tied to geometry; zero out the whole conditioning vector
-            # (features + flags + patch location) but keep its length.
             context = torch.zeros_like(context)
 
         return {
@@ -290,11 +278,7 @@ _TICA_NAME = re.compile(r"hlsp_tica_tess_ffi_s\d+-(?:o\d+-)?(\d{8})-cam(\d)-ccd\
 
 def parse_ffi_camera(filename: str) -> Tuple[Optional[str], Optional[str]]:
     """
-    Parse the FFI number and camera from a TICA filename, e.g.
-    'hlsp_tica_tess_ffi_s0002-o1-00006084-cam1-ccd1_tess_v01_img_processed_im256x256'
-    -> ffi_num='00006084', camera='1'. The orbit field is optional: sectors
-    27-35 are delivered as 'hlsp_tica_tess_ffi_s27-00116470-cam1-ccd1_...'.
-    Returns (None, None) for any other name.
+    Parse the FFI number and camera from a TICA filename, returns None else
     """
     match = _TICA_NAME.match(filename)
     if match is None:
@@ -344,9 +328,8 @@ def parse_orbit_ranges(valid_orbits) -> List[Tuple[int, int]]:
 def create_train_valid_datasets_by_orbit(dataset: TESSDataset, valid_orbits):
     """
     Create training and validation datasets using orbit number as the split
-    criterion. Frames whose orbit falls in any of the valid_orbits ranges
-    (e.g. ['10-12', '14-20'], see parse_orbit_ranges) go to validation; every
-    other frame goes to training.
+    criterion.
+
     """
     ranges = parse_orbit_ranges(valid_orbits)
     in_valid = [
@@ -399,7 +382,8 @@ class _RawFluxDataset(Dataset):
 
 def compute_image_stats(dataset: TESSDataset, indices, device=None,
                         max_images=None, batch_size=16, num_workers=8):
-    """ """
+    """ 
+    """
     idx = sorted(set(int(i) for i in indices))
     if max_images is not None and len(idx) > int(max_images):
         sel = np.linspace(0, len(idx) - 1, int(max_images)).astype(int)

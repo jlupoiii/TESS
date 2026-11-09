@@ -166,7 +166,7 @@ def log_sample_images(
     # Extract data (limited to n_datapoint)
     x_real = data_batch['y'][:n_datapoint].to(device)
     c_real = data_batch['x'][:n_datapoint].to(device)
-    # Optional metadata: TESS datasets carry ffi_num/orbit; others (e.g. ImageNet)
+    # Optional metadata: TESS datasets carry ffi_num/orbit;
     # carry a class label or nothing. Build a per-sample caption that adapts.
     ffi_nums = data_batch['ffi_num'][:n_datapoint] if 'ffi_num' in data_batch else None
     orbits = data_batch['orbit'][:n_datapoint] if 'orbit' in data_batch else None
